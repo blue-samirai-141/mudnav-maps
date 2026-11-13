@@ -32,6 +32,25 @@ def encode_coords(geom):
         plat, plon = lat, lon
     return ",".join(out)
 
+CLOSED = ("no", "private")
+
+def relevant(t):
+    """Tylko faktyczne zakazy (no/private) i ograniczenia czasowe – resztę i tak odrzuca aplikacja."""
+    if any(k.endswith(":conditional") for k in t if k.startswith(("access", "foot"))):
+        return True
+    return t.get("access") in CLOSED or t.get("foot") in CLOSED
+
+def overpass(src, q, rid):
+    for attempt in range(3):
+        for ep in src["overpass"]:
+            try:
+                return json.loads(get(ep, urllib.parse.urlencode({"data": q}).encode(), timeout=240))
+            except Exception as ex:
+                log("overpass", ep, rid, "próba", attempt + 1, "błąd:", ex)
+                time.sleep(20)
+        time.sleep(60 * (attempt + 1))
+    raise RuntimeError(f"Overpass niedostępny dla {rid}")
+
 def closures(cfg, src):
     regions = cfg["ranges"]
     seen, lines = set(), []
@@ -41,23 +60,16 @@ def closures(cfg, src):
 rel[route~"^(hiking|foot)$"]({s},{w},{n},{e})->.r;
 way(r.r)[~"^(access|foot)(:conditional)?$"~"."]({s},{w},{n},{e});
 out tags geom;"""
-        data = None
-        for ep in src["overpass"]:
-            try:
-                data = json.loads(get(ep, urllib.parse.urlencode({"data": q}).encode(), timeout=240))
-                break
-            except Exception as ex:
-                log("overpass", ep, r["id"], "błąd:", ex)
-                time.sleep(10)
-        if data is None:
-            raise RuntimeError(f"Overpass niedostępny dla {r['id']}")
+        data = overpass(src, q, r["id"])
         for el in data.get("elements", []):
             if el.get("type") != "way" or el["id"] in seen or len(el.get("geometry", [])) < 2:
                 continue
             seen.add(el["id"])
             t = el.get("tags", {})
+            if not relevant(t):
+                continue
             lines.append(f"{encode_rule(t)}\t{(t.get('name:pl') or t.get('name') or '').replace(chr(9), ' ')}\t{encode_coords(el['geometry'])}")
-        log("zamknięcia", r["id"], len(seen))
+        log("zamknięcia", r["id"], "odcinki z tagami:", len(seen), "po filtrze (razem):", len(lines))
         time.sleep(5)
     with open("closures.tsv", "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + ("\n" if lines else ""))
@@ -65,6 +77,7 @@ out tags geom;"""
 
 # ---------------------------------------------------------------- 2. lawiny
 
+WORDS = [("bardzo wysokie", 5), ("wysokie", 4), ("znaczne", 3), ("umiarkowane", 2), ("niskie", 1)]
 LEVELS = {"low": 1, "moderate": 2, "considerable": 3, "high": 4, "very_high": 5}
 SK_RANGES = {
     "VYSOKE_TATRY": ["Vysoké Tatry", "Belianske Tatry", "High Tatras"],
@@ -118,13 +131,19 @@ def page_level(entry):
     plain = re.sub(r"\s+", " ", plain)
     log(entry["source"], "fragment:", plain[:600])
     m = re.findall(r"(?:stopie[ńn]|stopnia)\D{0,40}?([1-5])\b", plain, re.I) or re.findall(r"\blaw0?([1-5])\b", text, re.I)
-    levels = sorted(set(int(x) for x in m))
+    levels = set(int(x) for x in m)
+    w = re.search(r"określono jako:?\s*(bardzo wysokie|wysokie|znaczne|umiarkowane|niskie)", plain, re.I)
+    if w:
+        levels.add(dict(WORDS)[w.group(1).lower()])
+    levels = sorted(levels)
     if len(levels) == 1:
         return {"range": entry["range"], "level": levels[0], "source": entry["source"], "url": entry["url"], "date": datetime.date.today().isoformat()}
     log(entry["source"], "niejednoznaczne:", levels)
     return None
 
 # ---------------------------------------------------------------- 3. komunikaty parków
+
+STRONG = ("zamkn", "zamyka", "uzavr", "uzávier", "uzavret", "oblodz", "utrudnie", "wiatroł", "nieprzejezd", "nieprzejść")
 
 def announcements(src):
     out = []
@@ -141,7 +160,7 @@ def announcements(src):
             if len(t) < 12 or len(t) > 200:
                 continue
             low = t.lower()
-            if not any(k in low for k in kw) or not any(k in low for k in ("zamkn", "uzav", "lawin", "lavín", "oblodz")):
+            if not any(k in low for k in kw) or not any(k in low for k in STRONG):
                 continue
             url = urllib.parse.urljoin(a["url"], href)
             if not url.startswith("http"):
@@ -156,7 +175,7 @@ def announcements(src):
 def main():
     cfg = json.load(open("regions.json", encoding="utf-8"))
     src = json.load(open("sources.json", encoding="utf-8"))
-    result = {"generated": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"), "avalanche": [], "announcements": [], "closures": None}
+    result = {"generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "avalanche": [], "announcements": [], "closures": None}
     try:
         result["closures"] = closures(cfg, src)
     except Exception as ex:
