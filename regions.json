@@ -11,9 +11,9 @@
     {"id": "nizne-tatry", "name": "Niżne Tatry (SK)", "bbox": [48.80, 19.15, 49.05, 20.25]}
   ],
   "countries": [
-    {"id": "polska-poludnie", "name": "Polska – południe (góry, Śląsk, Małopolska, Podkarpacie)", "geofabrik": "poland", "bbox": [49.00, 14.10, 51.10, 24.20]},
-    {"id": "polska-srodek", "name": "Polska – środek (Wrocław, Łódź, Warszawa, Lublin)", "geofabrik": "poland", "bbox": [51.00, 14.10, 52.80, 24.20]},
-    {"id": "polska-polnoc", "name": "Polska – północ (Pomorze, Mazury, Podlasie)", "geofabrik": "poland", "bbox": [52.70, 14.10, 54.90, 24.20]},
+    {"id": "polska-poludnie", "name": "Polska – południe", "geofabrik": "poland", "bbox": [49.00, 14.10, 51.10, 24.20]},
+    {"id": "polska-srodek", "name": "Polska – środek", "geofabrik": "poland", "bbox": [51.00, 14.10, 52.80, 24.20]},
+    {"id": "polska-polnoc", "name": "Polska – północ", "geofabrik": "poland", "bbox": [52.70, 14.10, 54.90, 24.20]},
     {"id": "czechy", "name": "Czechy", "geofabrik": "czech-republic"},
     {"id": "slowacja", "name": "Słowacja", "geofabrik": "slovakia"}
   ]
