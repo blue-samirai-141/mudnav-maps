@@ -1,11 +1,12 @@
 name: Mapy offline
 
-# Co tydzień (niedziela w nocy) albo ręcznie: mapy Mapsforge z OpenStreetMap (Geofabrik)
+# Co tydzień w czwartek w nocy (świeże mapy przed piątkowymi wyjściami na weekend) albo ręcznie: mapy Mapsforge z OpenStreetMap (Geofabrik)
 # – pasma górskie (małe pliki) i całe kraje PL/CZ/SK – w wydaniu „latest” razem z katalogiem maps.json.
 on:
   workflow_dispatch:
   schedule:
-    - cron: "41 1 * * 0"
+    # Czwartek 01:41 UTC (02:41/03:41 w Polsce) – budowanie trwa kilka godzin, mapy są gotowe w czwartek rano.
+    - cron: "41 1 * * 4"
   # Zmiana regionów albo workflow – od razu nowe mapy.
   push:
     paths:
