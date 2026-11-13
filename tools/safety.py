@@ -51,16 +51,40 @@ def overpass(src, q, rid):
         time.sleep(60 * (attempt + 1))
     raise RuntimeError(f"Overpass niedostępny dla {rid}")
 
+def previous_closures():
+    """Wczorajszy closures.tsv z wydania – zapas dla pasm, których Overpass dziś nie oddał."""
+    try:
+        return get("https://github.com/blue-samirai-141/mudnav-maps/releases/download/latest/closures.tsv", timeout=60).splitlines()
+    except Exception as ex:
+        log("brak wczorajszych zamknięć:", ex)
+        return []
+
+def first_point(line):
+    try:
+        nums = line.split("\t")[2].split(",")
+        return int(nums[0]) / SCALE, int(nums[1]) / SCALE
+    except Exception:
+        return None
+
+def in_bbox(pt, bbox):
+    s, w, n, e = bbox
+    return pt is not None and s <= pt[0] <= n and w <= pt[1] <= e
+
 def closures(cfg, src):
-    regions = cfg["ranges"]
-    seen, lines = set(), []
-    for r in regions:
+    """Zwraca (liczba odcinków, obszary kompletne dziś). Nieudane pasmo: wczorajsze dane, bez pokrycia."""
+    seen, lines, covered, failed = set(), [], [], []
+    for r in cfg["ranges"]:
         s, w, n, e = r["bbox"]
-        q = f"""[out:json][timeout:180];
+        q = f"""[out:json][timeout:300];
 rel[route~"^(hiking|foot)$"]({s},{w},{n},{e})->.r;
 way(r.r)[~"^(access|foot)(:conditional)?$"~"."]({s},{w},{n},{e});
 out tags geom;"""
-        data = overpass(src, q, r["id"])
+        try:
+            data = overpass(src, q, r["id"])
+        except Exception as ex:
+            log("zamknięcia", r["id"], "– pomijam dziś:", ex)
+            failed.append(r)
+            continue
         for el in data.get("elements", []):
             if el.get("type") != "way" or el["id"] in seen or len(el.get("geometry", [])) < 2:
                 continue
@@ -69,11 +93,20 @@ out tags geom;"""
             if not relevant(t):
                 continue
             lines.append(f"{encode_rule(t)}\t{(t.get('name:pl') or t.get('name') or '').replace(chr(9), ' ')}\t{encode_coords(el['geometry'])}")
+        covered.append(r["bbox"])
         log("zamknięcia", r["id"], "odcinki z tagami:", len(seen), "po filtrze (razem):", len(lines))
-        time.sleep(5)
+        time.sleep(15)
+    if failed:
+        prev = previous_closures()
+        kept = [l for l in prev if any(in_bbox(first_point(l), r["bbox"]) for r in failed)
+                and not any(in_bbox(first_point(l), b) for b in covered)]
+        log("z wczoraj dla", [r["id"] for r in failed], ":", len(kept))
+        lines += kept
+    if not covered and not lines:
+        raise RuntimeError("Overpass niedostępny dla wszystkich pasm")
     with open("closures.tsv", "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + ("\n" if lines else ""))
-    return len(lines)
+    return len(lines), covered
 
 # ---------------------------------------------------------------- 2. lawiny
 
@@ -177,9 +210,8 @@ def main():
     src = json.load(open("sources.json", encoding="utf-8"))
     result = {"generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "avalanche": [], "announcements": [], "closures": None, "coverage": []}
     try:
-        result["closures"] = closures(cfg, src)
-        # Obszary, w których closures.tsv jest kompletny – tam aplikacja ufa tylko świeżym danym.
-        result["coverage"] = [r["bbox"] for r in cfg["ranges"]]
+        # coverage: obszary, w których closures.tsv jest dziś kompletny – tam aplikacja ufa tylko świeżym danym.
+        result["closures"], result["coverage"] = closures(cfg, src)
     except Exception as ex:
         log("zamknięcia – pomijam:", ex)
     try:
