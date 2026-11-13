@@ -42,7 +42,7 @@ jobs:
       - name: Dane OSM PL + CZ + SK
         run: |
           for c in poland czech-republic slovakia; do
-            curl -sSfL --retry 3 -o "$c.osm.pbf" "https://download.geofabrik.de/europe/$c-latest.osm.pbf"
+            curl -sSfL --retry 5 --retry-all-errors --retry-delay 20 -o "$c.osm.pbf" "https://download.geofabrik.de/europe/$c-latest.osm.pbf"
           done
           osmium merge poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf -o raw.osm.pbf
           rm poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf
@@ -102,7 +102,7 @@ jobs:
         # Mapa kraju: tylko to, co rysuje mapa turystyczna. Bez zwykłych budynków i samych adresów (ok. połowa danych
         # OSM) – zostają budynki z nazwą lub funkcją (schroniska, kościoły, sklepy). Pasma górskie mają pełne dane.
         run: |
-          curl -sSfL --retry 3 -o in.osm.pbf "https://download.geofabrik.de/europe/${{ matrix.geofabrik }}-latest.osm.pbf"
+          curl -sSfL --retry 5 --retry-all-errors --retry-delay 20 -o in.osm.pbf "https://download.geofabrik.de/europe/${{ matrix.geofabrik }}-latest.osm.pbf"
           osmium tags-filter in.osm.pbf \
             nwr/highway nwr/railway nwr/aeroway nwr/aerialway nwr/waterway nwr/natural nwr/landuse nwr/leisure \
             nwr/amenity nwr/tourism nwr/historic nwr/man_made nwr/place nwr/sport nwr/shop nwr/military nwr/water \
@@ -117,11 +117,12 @@ jobs:
           mv merged.osm.pbf slim.osm.pbf
           rm hiking.osm.pbf trails.osm.pbf
           # Część kraju: wycinek prostokąta (bbox w regions.json: minLat,minLon,maxLat,maxLon; osmium chce lon,lat).
-          if [ -n "${{ matrix.bbox }}" ]; then
-            IFS=, read -r s w n e <<< "${{ matrix.bbox }}"
-            osmium extract -b "$w,$s,$e,$n" slim.osm.pbf -o part.osm.pbf --overwrite
-            mv part.osm.pbf slim.osm.pbf
-          fi
+          # Cały kraj też przechodzi przez extract (prostokąt całej Ziemi): plik prosto z `osmium merge` ze szlakami
+          # wywracał czytnik osmosis (brak pamięci na samym końcu dróg), po extract działa.
+          BBOX="${{ matrix.bbox }}"
+          IFS=, read -r s w n e <<< "${BBOX:--89.9,-179.9,89.9,179.9}"
+          osmium extract -b "$w,$s,$e,$n" slim.osm.pbf -o part.osm.pbf --overwrite
+          mv part.osm.pbf slim.osm.pbf
           ls -la slim.osm.pbf
       - name: Mapa kraju (najpierw w pamięci, przy braku pamięci – na dysku)
         env:
