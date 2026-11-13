@@ -6,6 +6,12 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "41 1 * * 0"
+  # Zmiana regionów albo workflow – od razu nowe mapy.
+  push:
+    paths:
+      - "regions.json"
+      - ".github/workflows/maps.yml"
+      - "tools/**"
 
 permissions:
   contents: write
