@@ -37,8 +37,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -la maps
+          TAG="maps-${{ inputs.run_id || github.run_id }}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
           gh release download latest -p maps.json -O old.json 2>/dev/null || true
-          python3 tools/manifest.py maps maps.json old.json && cat maps.json
+          python3 tools/manifest.py maps maps.json old.json \
+            "https://github.com/${{ github.repository }}/releases/download/$TAG" && cat maps.json
+      - name: Wydanie wersji (niezmienne adresy plików)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --latest=false --title "Mapy $(date -u +%Y-%m-%d) ($TAG)" \
+              --notes "Jedna wersja map offline – pobieranie rozpoczęte z tej wersji dokończy się mimo nowszych map. Usuwana po 7 dniach, gdy nikt już jej nie używa. Dane © współtwórcy OpenStreetMap, ODbL."
+          fi
+          gh release upload "$TAG" maps/*.map --clobber
       - name: Wydanie „latest”
         env:
           GH_TOKEN: ${{ github.token }}
@@ -47,4 +59,18 @@ jobs:
             gh release create latest --title "Mapy offline MudNav" \
               --notes "Mapy Mapsforge z OpenStreetMap dla aplikacji MudNav. Dane © współtwórcy OpenStreetMap, licencja ODbL."
           fi
+          # Pliki także w „latest” – dla starszych wersji aplikacji (bez adresów wersji w katalogu).
           gh release upload latest maps/*.map maps.json --clobber
+      - name: Sprzątanie starych wersji
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Wersja zostaje, dopóki katalog ją wskazuje, i jeszcze 7 dni potem (na dokończenie pobierań).
+          cutoff=$(date -u -d '7 days ago' +%s)
+          gh release list --limit 100 --json tagName,createdAt -q '.[] | "\(.tagName) \(.createdAt)"' | while read -r tag created; do
+            case "$tag" in maps-*) ;; *) continue ;; esac
+            grep -q "/download/$tag/" maps.json && continue
+            [ "$(date -u -d "$created" +%s)" -lt "$cutoff" ] || continue
+            echo "Usuwam $tag"
+            gh release delete "$tag" --cleanup-tag -y || true
+          done

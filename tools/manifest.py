@@ -8,7 +8,7 @@ def sha256(path):
             h.update(chunk)
     return h.hexdigest()
 
-def main(maps_dir, out, merge=None):
+def main(maps_dir, out, merge=None, url_base=None):
     cfg = json.load(open('regions.json', encoding='utf-8'))
     today = datetime.date.today().isoformat()
     regions = []
@@ -22,6 +22,9 @@ def main(maps_dir, out, merge=None):
                 'id': r['id'], 'name': r['name'], 'kind': kind, 'file': r['id'] + '.map',
                 'sizeBytes': os.path.getsize(path), 'sha256': sha256(path),
                 'bbox': r.get('bbox', []), 'date': today,
+                # Niezmienny adres tej wersji (wydanie maps-<przebieg>): rozpoczęte pobieranie dokończy się,
+                # nawet gdy w międzyczasie wyjdą nowe mapy.
+                **({'url': url_base.rstrip('/') + '/' + r['id'] + '.map'} if url_base else {}),
             })
     # Częściowa publikacja (np. same pasma): mapy niezbudowane teraz zostają z poprzedniego katalogu.
     if merge and os.path.exists(merge):
@@ -38,4 +41,4 @@ def main(maps_dir, out, merge=None):
     print(len(regions), 'map w katalogu')
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
+    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None, sys.argv[4] if len(sys.argv) > 4 else None)
