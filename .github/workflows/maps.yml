@@ -37,13 +37,20 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool osmosis
           mkdir -p ~/.openstreetmap/osmosis/plugins
           curl -sSfL --retry 3 -o ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar "$WRITER"
+          pip install -q --break-system-packages "osmium>=4"
+          python3 tools/tag_mapping.py ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar tag-mapping.xml
       - name: Dane OSM PL + CZ + SK
         run: |
           for c in poland czech-republic slovakia; do
             curl -sSfL --retry 3 -o "$c.osm.pbf" "https://download.geofabrik.de/europe/$c-latest.osm.pbf"
           done
-          osmium merge poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf -o all.osm.pbf
+          osmium merge poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf -o raw.osm.pbf
           rm poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf
+          # Szlaki turystyczne jako osobne linie z kolorem (trail_red=yes …) – patrz tools/trails.py.
+          osmium tags-filter raw.osm.pbf r/route=hiking -o hiking.osm.pbf
+          python3 tools/trails.py hiking.osm.pbf trails.osm.pbf
+          osmium merge raw.osm.pbf trails.osm.pbf -o all.osm.pbf
+          rm raw.osm.pbf hiking.osm.pbf trails.osm.pbf
       - name: Mapy pasm górskich
         env:
           JAVACMD_OPTIONS: -Xmx10g
@@ -56,7 +63,8 @@ jobs:
               sub = f"{r['id']}.osm.pbf"
               subprocess.run(['osmium', 'extract', '-b', f'{w},{s},{e},{n}', '--set-bounds', 'all.osm.pbf', '-o', sub, '--overwrite'], check=True)
               subprocess.run(['osmosis', '--rbf', f'file={sub}', '--mapfile-writer', f"file=out/{r['id']}.map",
-                              f'bbox={s},{w},{n},{e}', 'type=ram', 'threads=4', 'comment=MudNav - dane (c) OpenStreetMap, ODbL'], check=True)
+                              f'bbox={s},{w},{n},{e}', 'type=ram', 'threads=4', 'tag-conf-file=tag-mapping.xml',
+                              'comment=MudNav - dane (c) OpenStreetMap, ODbL'], check=True)
               subprocess.run(['rm', sub], check=True)
               print(r['id'], 'gotowe')
           PY
@@ -82,11 +90,14 @@ jobs:
           - { id: czechy, geofabrik: czech-republic }
           - { id: slowacja, geofabrik: slovakia }
     steps:
+      - uses: actions/checkout@v4
       - name: Narzędzia
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq osmosis osmium-tool
           mkdir -p ~/.openstreetmap/osmosis/plugins
           curl -sSfL --retry 3 -o ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar "$WRITER"
+          pip install -q --break-system-packages "osmium>=4"
+          python3 tools/tag_mapping.py ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar tag-mapping.xml
       - name: Odchudzenie danych
         # Mapa kraju: tylko to, co rysuje mapa turystyczna. Bez zwykłych budynków i samych adresów (ok. połowa danych
         # OSM) – zostają budynki z nazwą lub funkcją (schroniska, kościoły, sklepy). Pasma górskie mają pełne dane.
@@ -98,7 +109,13 @@ jobs:
             nwr/wetland nwr/mountain_pass nwr/piste:type nwr/power=line,minor_line,tower nwr/name \
             r/route r/boundary=administrative,national_park,protected_area r/type=multipolygon \
             -o slim.osm.pbf --overwrite
+          # Szlaki turystyczne jako osobne linie z kolorem (trail_red=yes …) – patrz tools/trails.py.
+          osmium tags-filter in.osm.pbf r/route=hiking -o hiking.osm.pbf
+          python3 tools/trails.py hiking.osm.pbf trails.osm.pbf
           rm in.osm.pbf
+          osmium merge slim.osm.pbf trails.osm.pbf -o merged.osm.pbf --overwrite
+          mv merged.osm.pbf slim.osm.pbf
+          rm hiking.osm.pbf trails.osm.pbf
           # Część kraju: wycinek prostokąta (bbox w regions.json: minLat,minLon,maxLat,maxLon; osmium chce lon,lat).
           if [ -n "${{ matrix.bbox }}" ]; then
             IFS=, read -r s w n e <<< "${{ matrix.bbox }}"
@@ -113,7 +130,7 @@ jobs:
           mkdir -p out
           write() {
             osmosis --rbf file=slim.osm.pbf --mapfile-writer file=out/${{ matrix.id }}.map type=$1 threads=4 \
-              ${{ matrix.bbox && format('bbox={0}', matrix.bbox) || '' }} \
+              ${{ matrix.bbox && format('bbox={0}', matrix.bbox) || '' }} tag-conf-file=tag-mapping.xml \
               skip-invalid-relations=true "comment=MudNav - dane (c) OpenStreetMap, ODbL"
           }
           start=$(date +%s)

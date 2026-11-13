@@ -31,3 +31,10 @@ a gdy się nie zmieści – na dysku (`type=hd`). Pasma górskie mają pełne da
 
 Polska jest dzielona na trzy pasy (osmium `extract`, zakładka ok. 10 km), bo w całości nie mieściła się w pamięci
 (budowa na dysku trwała prawie 3 h). Czechy i Słowacja w pamięci: ok. 10 min każda.
+
+## Szlaki w mapach offline
+
+Mapsforge nie zna relacji OSM, więc `tools/trails.py` zamienia szlaki (`route=hiking`, kolor z `osmc:symbol`
+albo `colour`) na osobne linie z tagami `trail_red`/`trail_blue`/`trail_green`/`trail_yellow`/`trail_black=yes`
+(te same punkty co droga). `tools/tag_mapping.py` dopisuje te tagi do domyślnego tag-mappingu writera.
+Aplikacja rysuje je stylem `TrailsRenderTheme` (wbudowany styl + linie w kolorach PTTK obok siebie).
