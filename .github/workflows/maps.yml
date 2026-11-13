@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: maps
@@ -97,26 +98,17 @@ jobs:
           path: out/*.map
           retention-days: 3
 
+  # Pasma od razu po zbudowaniu – nie czekają na całe kraje (Polska buduje się kilka godzin).
+  publish-ranges:
+    needs: ranges
+    uses: ./.github/workflows/publish.yml
+    with:
+      pattern: maps-ranges
+
   publish:
-    needs: [ranges, countries]
-    # Pasma publikujemy nawet, gdy któryś kraj się nie zbudował.
+    needs: [ranges, countries, publish-ranges]
+    # Kraje dokładamy, gdy są gotowe; pasma publikujemy nawet, gdy któryś kraj się nie zbudował.
     if: always() && needs.ranges.result == 'success'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: maps-*
-          path: maps
-          merge-multiple: true
-      - name: Katalog maps.json
-        run: python3 tools/manifest.py maps maps.json && cat maps.json
-      - name: Wydanie „latest”
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if ! gh release view latest >/dev/null 2>&1; then
-            gh release create latest --title "Mapy offline MudNav" \
-              --notes "Mapy Mapsforge z OpenStreetMap dla aplikacji MudNav. Dane © współtwórcy OpenStreetMap, licencja ODbL."
-          fi
-          gh release upload latest maps/*.map maps.json --clobber
+    uses: ./.github/workflows/publish.yml
+    with:
+      pattern: maps-*

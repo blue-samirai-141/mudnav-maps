@@ -8,7 +8,7 @@ def sha256(path):
             h.update(chunk)
     return h.hexdigest()
 
-def main(maps_dir, out):
+def main(maps_dir, out, merge=None):
     cfg = json.load(open('regions.json', encoding='utf-8'))
     today = datetime.date.today().isoformat()
     regions = []
@@ -23,8 +23,19 @@ def main(maps_dir, out):
                 'sizeBytes': os.path.getsize(path), 'sha256': sha256(path),
                 'bbox': r.get('bbox', []), 'date': today,
             })
+    # Częściowa publikacja (np. same pasma): mapy niezbudowane teraz zostają z poprzedniego katalogu.
+    if merge and os.path.exists(merge):
+        try:
+            old = json.load(open(merge, encoding='utf-8')).get('regions', [])
+        except ValueError:
+            old = []
+        fresh = {r['id'] for r in regions}
+        known = {r['id'] for items in (cfg['ranges'], cfg['countries']) for r in items}
+        regions += [r for r in old if r.get('id') not in fresh and r.get('id') in known]
+        order = [r['id'] for items in (cfg['ranges'], cfg['countries']) for r in items]
+        regions.sort(key=lambda r: order.index(r['id']))
     json.dump({'generated': today, 'baseUrl': '', 'regions': regions}, open(out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     print(len(regions), 'map w katalogu')
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)

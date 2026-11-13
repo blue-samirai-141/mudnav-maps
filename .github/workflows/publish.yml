@@ -1,0 +1,50 @@
+name: Publikacja map
+
+# Wrzuca zbudowane mapy (artefakty) do wydania „latest” i aktualizuje maps.json.
+# Wywoływana z „Mapy offline” (najpierw pasma, potem całość) albo ręcznie z numerem przebiegu.
+on:
+  workflow_call:
+    inputs:
+      pattern:
+        type: string
+        default: "maps-*"
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Numer przebiegu „Mapy offline” z gotowymi artefaktami"
+        required: true
+      pattern:
+        default: "maps-*"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.pattern }}
+          path: maps
+          merge-multiple: true
+          run-id: ${{ inputs.run_id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Katalog maps.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la maps
+          gh release download latest -p maps.json -O old.json 2>/dev/null || true
+          python3 tools/manifest.py maps maps.json old.json && cat maps.json
+      - name: Wydanie „latest”
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view latest >/dev/null 2>&1; then
+            gh release create latest --title "Mapy offline MudNav" \
+              --notes "Mapy Mapsforge z OpenStreetMap dla aplikacji MudNav. Dane © współtwórcy OpenStreetMap, licencja ODbL."
+          fi
+          gh release upload latest maps/*.map maps.json --clobber
