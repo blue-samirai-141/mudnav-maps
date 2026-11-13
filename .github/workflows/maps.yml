@@ -42,7 +42,10 @@ jobs:
       - name: Dane OSM PL + CZ + SK
         run: |
           for c in poland czech-republic slovakia; do
-            curl -sSfL --retry 5 --retry-all-errors --retry-delay 20 -o "$c.osm.pbf" "https://download.geofabrik.de/europe/$c-latest.osm.pbf"
+            for i in 1 2 3 4 5 6; do
+              curl -sSfL --retry 3 --retry-all-errors -o "$c.osm.pbf" "https://download.geofabrik.de/europe/$c-latest.osm.pbf" && break
+              [ $i = 6 ] && exit 1; sleep 60
+            done
           done
           osmium merge poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf -o raw.osm.pbf
           rm poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf
@@ -87,8 +90,10 @@ jobs:
           - { id: polska-poludnie, geofabrik: poland, bbox: "49.00,14.10,51.10,24.20" }
           - { id: polska-srodek, geofabrik: poland, bbox: "51.00,14.10,52.80,24.20" }
           - { id: polska-polnoc, geofabrik: poland, bbox: "52.70,14.10,54.90,24.20" }
-          - { id: czechy, geofabrik: czech-republic }
-          - { id: slowacja, geofabrik: slovakia }
+          # Prostokąt zawsze podany: bez niego writer brał granice z nagłówka pliku (po scaleniu ze szlakami – cała
+          # Ziemia) i kończyła mu się pamięć.
+          - { id: czechy, geofabrik: czech-republic, bbox: "48.54,12.08,51.07,18.87" }
+          - { id: slowacja, geofabrik: slovakia, bbox: "47.72,16.82,49.62,22.58" }
     steps:
       - uses: actions/checkout@v4
       - name: Narzędzia
@@ -102,7 +107,11 @@ jobs:
         # Mapa kraju: tylko to, co rysuje mapa turystyczna. Bez zwykłych budynków i samych adresów (ok. połowa danych
         # OSM) – zostają budynki z nazwą lub funkcją (schroniska, kościoły, sklepy). Pasma górskie mają pełne dane.
         run: |
-          curl -sSfL --retry 5 --retry-all-errors --retry-delay 20 -o in.osm.pbf "https://download.geofabrik.de/europe/${{ matrix.geofabrik }}-latest.osm.pbf"
+          # Geofabrik bywa chwilowo nieosiągalny – kilka prób co minutę.
+          for i in 1 2 3 4 5 6; do
+            curl -sSfL --retry 3 --retry-all-errors -o in.osm.pbf "https://download.geofabrik.de/europe/${{ matrix.geofabrik }}-latest.osm.pbf" && break
+            [ $i = 6 ] && exit 1; sleep 60
+          done
           osmium tags-filter in.osm.pbf \
             nwr/highway nwr/railway nwr/aeroway nwr/aerialway nwr/waterway nwr/natural nwr/landuse nwr/leisure \
             nwr/amenity nwr/tourism nwr/historic nwr/man_made nwr/place nwr/sport nwr/shop nwr/military nwr/water \
@@ -117,10 +126,7 @@ jobs:
           mv merged.osm.pbf slim.osm.pbf
           rm hiking.osm.pbf trails.osm.pbf
           # Część kraju: wycinek prostokąta (bbox w regions.json: minLat,minLon,maxLat,maxLon; osmium chce lon,lat).
-          # Cały kraj też przechodzi przez extract (prostokąt całej Ziemi): plik prosto z `osmium merge` ze szlakami
-          # wywracał czytnik osmosis (brak pamięci na samym końcu dróg), po extract działa.
-          BBOX="${{ matrix.bbox }}"
-          IFS=, read -r s w n e <<< "${BBOX:--89.9,-179.9,89.9,179.9}"
+          IFS=, read -r s w n e <<< "${{ matrix.bbox }}"
           osmium extract -b "$w,$s,$e,$n" slim.osm.pbf -o part.osm.pbf --overwrite
           mv part.osm.pbf slim.osm.pbf
           ls -la slim.osm.pbf
