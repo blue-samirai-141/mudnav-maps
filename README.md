@@ -11,3 +11,14 @@ Regiony: `regions.json`. Ręczne zbudowanie: Actions → „Mapy offline” → 
 
 Dane © współtwórcy OpenStreetMap, udostępnione na licencji [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/).
 Pliki map są bazą pochodną OSM i podlegają tej samej licencji.
+
+## Codzienny checker bezpieczeństwa
+
+Workflow „Bezpieczeństwo (codziennie)” działa o **4:17 czasu polskiego** (przez cały rok – przed porannymi wyjściami w góry)
+i publikuje w wydaniu `latest`:
+
+- `closures.tsv` – zamknięte odcinki szlaków z OpenStreetMap (zakazy i okresowe zamknięcia `*:conditional`) w pasmach z `regions.json`,
+- `safety.json` – zagrożenie lawinowe (Słowacja z CAAML, TOPR ze strony komunikatu), komunikaty parków narodowych o zamknięciach
+  i obszary, dla których zamknięcia są kompletne.
+
+Aplikacja pobiera oba pliki raz na dobę, gdy ma internet; bez internetu używa ostatnio pobranych. Źródła: `sources.json`.

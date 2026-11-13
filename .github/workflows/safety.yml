@@ -1,11 +1,15 @@
 name: Bezpieczeństwo (codziennie)
 
-# Codziennie rano: zamknięte szlaki (OSM), zagrożenie lawinowe i komunikaty parków → safety.json i closures.tsv
+# Codziennie o 4:17 czasu polskiego: zamknięte szlaki (OSM), zagrożenie lawinowe i komunikaty parków → safety.json i closures.tsv
 # w wydaniu „latest”. Aplikacja pobiera je raz dziennie (bez internetu – ostatnio pobrane).
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 4 * * *"
+    # 4:17 czasu polskiego przez cały rok: zimą (UTC+1) to 3:17 UTC, latem (UTC+2) 2:17 UTC.
+    # Oba wpisy uruchamiają się codziennie; krok „Pora” przepuszcza ten pasujący do czasu zimowego/letniego
+    # (po strefie, nie po godzinie – opóźnione uruchomienie GitHuba nie przepada).
+    - cron: "17 2 * * *"
+    - cron: "17 3 * * *"
   push:
     paths:
       - "tools/safety.py"
@@ -24,10 +28,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Pora (4:17 w Polsce)
+        id: pora
+        run: |
+          OFF=$(TZ=Europe/Warsaw date +%z)
+          if [ "$OFF" = "+0200" ]; then WANT="17 2 * * *"; else WANT="17 3 * * *"; fi
+          if [ "${{ github.event_name }}" = schedule ] && [ "${{ github.event.schedule }}" != "$WANT" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "Strefa $OFF – właściwa pora to \"$WANT\" UTC, pomijam."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.pora.outputs.run == 'true'
       - name: Sprawdzenie źródeł
+        if: steps.pora.outputs.run == 'true'
         run: python3 tools/safety.py
       - name: Publikacja w wydaniu „latest”
+        if: steps.pora.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
