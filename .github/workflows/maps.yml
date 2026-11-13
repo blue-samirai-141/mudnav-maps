@@ -80,17 +80,38 @@ jobs:
     steps:
       - name: Narzędzia
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq osmosis
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmosis osmium-tool
           mkdir -p ~/.openstreetmap/osmosis/plugins
           curl -sSfL --retry 3 -o ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar "$WRITER"
-      - name: Mapa kraju (tryb hd – mniej pamięci, dłużej)
+      - name: Odchudzenie danych
+        # Mapa kraju: tylko to, co rysuje mapa turystyczna. Bez zwykłych budynków i samych adresów (ok. połowa danych
+        # OSM) – zostają budynki z nazwą lub funkcją (schroniska, kościoły, sklepy). Pasma górskie mają pełne dane.
+        run: |
+          curl -sSfL --retry 3 -o in.osm.pbf "https://download.geofabrik.de/europe/${{ matrix.geofabrik }}-latest.osm.pbf"
+          osmium tags-filter in.osm.pbf \
+            nwr/highway nwr/railway nwr/aeroway nwr/aerialway nwr/waterway nwr/natural nwr/landuse nwr/leisure \
+            nwr/amenity nwr/tourism nwr/historic nwr/man_made nwr/place nwr/sport nwr/shop nwr/military nwr/water \
+            nwr/wetland nwr/mountain_pass nwr/piste:type nwr/power=line,minor_line,tower nwr/name \
+            r/route r/boundary=administrative,national_park,protected_area r/type=multipolygon \
+            -o slim.osm.pbf --overwrite
+          ls -la in.osm.pbf slim.osm.pbf
+          rm in.osm.pbf
+      - name: Mapa kraju (najpierw w pamięci, przy braku pamięci – na dysku)
         env:
-          JAVACMD_OPTIONS: -Xmx12g
+          JAVACMD_OPTIONS: -Xmx14g
         run: |
           mkdir -p out
-          curl -sSfL --retry 3 -o in.osm.pbf "https://download.geofabrik.de/europe/${{ matrix.geofabrik }}-latest.osm.pbf"
-          osmosis --rbf file=in.osm.pbf --mapfile-writer file=out/${{ matrix.id }}.map type=hd threads=4 \
-            "comment=MudNav - dane (c) OpenStreetMap, ODbL"
+          write() {
+            osmosis --rbf file=slim.osm.pbf --mapfile-writer file=out/${{ matrix.id }}.map type=$1 threads=4 \
+              skip-invalid-relations=true "comment=MudNav - dane (c) OpenStreetMap, ODbL"
+          }
+          start=$(date +%s)
+          if ! write ram; then
+            echo "Tryb w pamięci się nie zmieścił – buduję na dysku"
+            rm -f out/${{ matrix.id }}.map
+            write hd
+          fi
+          echo "Czas budowania: $(( ($(date +%s) - start) / 60 )) min"
           ls -la out
       - uses: actions/upload-artifact@v4
         with:

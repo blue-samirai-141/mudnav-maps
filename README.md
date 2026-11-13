@@ -22,3 +22,9 @@ i publikuje w wydaniu `latest`:
   i obszary, dla których zamknięcia są kompletne.
 
 Aplikacja pobiera oba pliki raz na dobę, gdy ma internet; bez internetu używa ostatnio pobranych. Źródła: `sources.json`.
+
+## Czas budowania
+
+Mapy krajów budowane są z odchudzonych danych (osmium `tags-filter`): bez zwykłych budynków i samych adresów,
+z budynkami, które mają nazwę lub funkcję (schroniska, kościoły, sklepy). Najpierw w pamięci (`type=ram`, szybko),
+a gdy się nie zmieści – na dysku (`type=hd`). Pasma górskie mają pełne dane i publikują się od razu po zbudowaniu.
