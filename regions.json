@@ -1,0 +1,18 @@
+{
+  "ranges": [
+    {"id": "tatry", "name": "Tatry (PL + SK)", "bbox": [49.05, 19.60, 49.40, 20.40]},
+    {"id": "beskidy-zachodnie", "name": "Beskid Śląski, Żywiecki, Mały i Makowski", "bbox": [49.35, 18.70, 49.85, 20.20]},
+    {"id": "pieniny-gorce", "name": "Gorce, Pieniny i Beskid Wyspowy", "bbox": [49.35, 19.90, 49.75, 20.70]},
+    {"id": "beskid-sadecki-niski", "name": "Beskid Sądecki i Niski", "bbox": [49.30, 20.50, 49.70, 21.90]},
+    {"id": "bieszczady", "name": "Bieszczady", "bbox": [49.00, 22.00, 49.45, 22.95]},
+    {"id": "karkonosze", "name": "Karkonosze (PL + CZ)", "bbox": [50.60, 15.30, 50.90, 16.00]},
+    {"id": "sudety", "name": "Sudety (PL + CZ)", "bbox": [50.10, 15.00, 50.95, 17.50]},
+    {"id": "fatry", "name": "Mała i Wielka Fatra (SK)", "bbox": [48.75, 18.80, 49.30, 19.35]},
+    {"id": "nizne-tatry", "name": "Niżne Tatry (SK)", "bbox": [48.80, 19.15, 49.05, 20.25]}
+  ],
+  "countries": [
+    {"id": "polska", "name": "Polska", "geofabrik": "poland"},
+    {"id": "czechy", "name": "Czechy", "geofabrik": "czech-republic"},
+    {"id": "slowacja", "name": "Słowacja", "geofabrik": "slovakia"}
+  ]
+}

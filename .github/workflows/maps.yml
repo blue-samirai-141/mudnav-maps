@@ -1,0 +1,114 @@
+name: Mapy offline
+
+# Co tydzień (niedziela w nocy) albo ręcznie: mapy Mapsforge z OpenStreetMap (Geofabrik)
+# – pasma górskie (małe pliki) i całe kraje PL/CZ/SK – w wydaniu „latest” razem z katalogiem maps.json.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 1 * * 0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: maps
+  cancel-in-progress: false
+
+env:
+  WRITER: https://repo1.maven.org/maven2/org/mapsforge/mapsforge-map-writer/0.21.0/mapsforge-map-writer-0.21.0-jar-with-dependencies.jar
+
+jobs:
+  ranges:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Narzędzia (osmium, osmosis + mapsforge-map-writer)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool osmosis
+          mkdir -p ~/.openstreetmap/osmosis/plugins
+          curl -sSfL --retry 3 -o ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar "$WRITER"
+      - name: Dane OSM PL + CZ + SK
+        run: |
+          for c in poland czech-republic slovakia; do
+            curl -sSfL --retry 3 -o "$c.osm.pbf" "https://download.geofabrik.de/europe/$c-latest.osm.pbf"
+          done
+          osmium merge poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf -o all.osm.pbf
+          rm poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf
+      - name: Mapy pasm górskich
+        env:
+          JAVACMD_OPTIONS: -Xmx10g
+        run: |
+          mkdir -p out
+          python3 - <<'PY'
+          import json, subprocess
+          for r in json.load(open('regions.json', encoding='utf-8'))['ranges']:
+              s, w, n, e = r['bbox']
+              sub = f"{r['id']}.osm.pbf"
+              subprocess.run(['osmium', 'extract', '-b', f'{w},{s},{e},{n}', '--set-bounds', 'all.osm.pbf', '-o', sub, '--overwrite'], check=True)
+              subprocess.run(['osmosis', '--rbf', f'file={sub}', '--mapfile-writer', f"file=out/{r['id']}.map",
+                              f'bbox={s},{w},{n},{e}', 'type=ram', 'threads=4', 'comment=MudNav - dane (c) OpenStreetMap, ODbL'], check=True)
+              subprocess.run(['rm', sub], check=True)
+              print(r['id'], 'gotowe')
+          PY
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maps-ranges
+          path: out/*.map
+          retention-days: 3
+
+  countries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: polska, geofabrik: poland }
+          - { id: czechy, geofabrik: czech-republic }
+          - { id: slowacja, geofabrik: slovakia }
+    steps:
+      - name: Narzędzia
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmosis
+          mkdir -p ~/.openstreetmap/osmosis/plugins
+          curl -sSfL --retry 3 -o ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar "$WRITER"
+      - name: Mapa kraju (tryb hd – mniej pamięci, dłużej)
+        env:
+          JAVACMD_OPTIONS: -Xmx12g
+        run: |
+          mkdir -p out
+          curl -sSfL --retry 3 -o in.osm.pbf "https://download.geofabrik.de/europe/${{ matrix.geofabrik }}-latest.osm.pbf"
+          osmosis --rbf file=in.osm.pbf --mapfile-writer file=out/${{ matrix.id }}.map type=hd threads=4 \
+            "comment=MudNav - dane (c) OpenStreetMap, ODbL"
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maps-${{ matrix.id }}
+          path: out/*.map
+          retention-days: 3
+
+  publish:
+    needs: [ranges, countries]
+    # Pasma publikujemy nawet, gdy któryś kraj się nie zbudował.
+    if: always() && needs.ranges.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: maps-*
+          path: maps
+          merge-multiple: true
+      - name: Katalog maps.json
+        run: python3 tools/manifest.py maps maps.json && cat maps.json
+      - name: Wydanie „latest”
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view latest >/dev/null 2>&1; then
+            gh release create latest --title "Mapy offline MudNav" \
+              --notes "Mapy Mapsforge z OpenStreetMap dla aplikacji MudNav. Dane © współtwórcy OpenStreetMap, licencja ODbL."
+          fi
+          gh release upload latest maps/*.map maps.json --clobber
