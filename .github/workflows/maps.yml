@@ -13,6 +13,7 @@ on:
       - "regions.json"
       - ".github/workflows/maps.yml"
       - "tools/**"
+      - "!tools/safety.py"
 
 permissions:
   contents: write
