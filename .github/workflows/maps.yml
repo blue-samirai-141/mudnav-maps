@@ -5,7 +5,7 @@ name: Mapy offline
 on:
   workflow_dispatch:
   schedule:
-    # Czwartek 01:41 UTC (02:41/03:41 w Polsce) – budowanie trwa kilka godzin, mapy są gotowe w czwartek rano.
+    # Czwartek 01:41 UTC (02:41/03:41 w Polsce) – mapy są gotowe w czwartek rano.
     - cron: "41 1 * * 4"
   # Zmiana regionów albo workflow – od razu nowe mapy.
   push:
@@ -74,7 +74,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { id: polska, geofabrik: poland }
+          # Polska w trzech pasach (zachodzą na siebie o ok. 10 km): każdy mieści się w pamięci, a turysta
+          # pobiera tylko swój kawałek. Cała Polska budowała się prawie 3 h i ważyła ok. 1 GB.
+          - { id: polska-poludnie, geofabrik: poland, bbox: "49.00,14.10,51.10,24.20" }
+          - { id: polska-srodek, geofabrik: poland, bbox: "51.00,14.10,52.80,24.20" }
+          - { id: polska-polnoc, geofabrik: poland, bbox: "52.70,14.10,54.90,24.20" }
           - { id: czechy, geofabrik: czech-republic }
           - { id: slowacja, geofabrik: slovakia }
     steps:
@@ -94,8 +98,14 @@ jobs:
             nwr/wetland nwr/mountain_pass nwr/piste:type nwr/power=line,minor_line,tower nwr/name \
             r/route r/boundary=administrative,national_park,protected_area r/type=multipolygon \
             -o slim.osm.pbf --overwrite
-          ls -la in.osm.pbf slim.osm.pbf
           rm in.osm.pbf
+          # Część kraju: wycinek prostokąta (bbox w regions.json: minLat,minLon,maxLat,maxLon; osmium chce lon,lat).
+          if [ -n "${{ matrix.bbox }}" ]; then
+            IFS=, read -r s w n e <<< "${{ matrix.bbox }}"
+            osmium extract -b "$w,$s,$e,$n" slim.osm.pbf -o part.osm.pbf --overwrite
+            mv part.osm.pbf slim.osm.pbf
+          fi
+          ls -la slim.osm.pbf
       - name: Mapa kraju (najpierw w pamięci, przy braku pamięci – na dysku)
         env:
           JAVACMD_OPTIONS: -Xmx14g
@@ -103,6 +113,7 @@ jobs:
           mkdir -p out
           write() {
             osmosis --rbf file=slim.osm.pbf --mapfile-writer file=out/${{ matrix.id }}.map type=$1 threads=4 \
+              ${{ matrix.bbox && format('bbox={0}', matrix.bbox) || '' }} \
               skip-invalid-relations=true "comment=MudNav - dane (c) OpenStreetMap, ODbL"
           }
           start=$(date +%s)
@@ -119,7 +130,7 @@ jobs:
           path: out/*.map
           retention-days: 3
 
-  # Pasma od razu po zbudowaniu – nie czekają na całe kraje (Polska buduje się kilka godzin).
+  # Pasma od razu po zbudowaniu – nie czekają na kraje.
   publish-ranges:
     needs: ranges
     uses: ./.github/workflows/publish.yml
