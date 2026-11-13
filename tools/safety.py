@@ -175,9 +175,11 @@ def announcements(src):
 def main():
     cfg = json.load(open("regions.json", encoding="utf-8"))
     src = json.load(open("sources.json", encoding="utf-8"))
-    result = {"generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "avalanche": [], "announcements": [], "closures": None}
+    result = {"generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "avalanche": [], "announcements": [], "closures": None, "coverage": []}
     try:
         result["closures"] = closures(cfg, src)
+        # Obszary, w których closures.tsv jest kompletny – tam aplikacja ufa tylko świeżym danym.
+        result["coverage"] = [r["bbox"] for r in cfg["ranges"]]
     except Exception as ex:
         log("zamknięcia – pomijam:", ex)
     try:
