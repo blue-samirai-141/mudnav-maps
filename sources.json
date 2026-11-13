@@ -1,0 +1,18 @@
+{
+  "overpass": ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"],
+  "avalanche": [
+    {"range": "TATRY_PL", "source": "TOPR", "url": "https://lawiny.topr.pl/", "widget": "https://lawiny.topr.pl/getwidget"},
+    {"range": "KARKONOSZE", "source": "GOPR Karkonosze", "url": "https://lawiny.gopr.pl/", "widget": "https://lawiny.gopr.pl/"}
+  ],
+  "slovakia": {"base": "https://static.laviny.sk/bulletins/", "url": "https://www.laviny.sk/"},
+  "announcements": [
+    {"source": "TPN", "url": "https://tpn.gov.pl/", "bbox": [49.17, 19.75, 49.32, 20.25]},
+    {"source": "TANAP", "url": "https://www.tanap.sk/", "bbox": [49.05, 19.60, 49.30, 20.40]},
+    {"source": "Babiogórski PN", "url": "https://bgpn.pl/", "bbox": [49.55, 19.45, 49.62, 19.62]},
+    {"source": "Karkonoski PN", "url": "https://kpnmab.pl/", "bbox": [50.68, 15.45, 50.86, 15.95]},
+    {"source": "Bieszczadzki PN", "url": "https://www.bdpn.gov.pl/", "bbox": [49.02, 22.40, 49.20, 22.85]},
+    {"source": "Pieniński PN", "url": "https://www.pieninypn.pl/", "bbox": [49.38, 20.30, 49.45, 20.50]},
+    {"source": "Gorczański PN", "url": "https://www.gorcepn.pl/", "bbox": [49.52, 20.05, 49.62, 20.25]}
+  ],
+  "keywords": ["zamkn", "zamknięt", "szlak", "lawin", "oblodz", "uzavret", "uzávier", "chodník", "lavín"]
+}
