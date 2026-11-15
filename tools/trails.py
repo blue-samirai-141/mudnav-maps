@@ -40,6 +40,9 @@ def main(src, out):
             cols = ways.get(way.id)
             if not cols or len(way.nodes) < 2:
                 continue
+            # Trasy narciarskie wpisane do relacji szlaku (bez drogi/ścieżki) nie są szlakiem pieszym.
+            if 'piste:type' in way.tags and 'highway' not in way.tags:
+                continue
             tags = {f'trail_{c}': 'yes' for c in sorted(cols)}
             # Wersja i czas jak w oryginale – osmosis odrzuca obiekty bez nich.
             w.add_way(osmium.osm.mutable.Way(

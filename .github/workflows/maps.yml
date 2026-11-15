@@ -37,7 +37,7 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool osmosis
           mkdir -p ~/.openstreetmap/osmosis/plugins
           curl -sSfL --retry 3 -o ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar "$WRITER"
-          pip install -q --break-system-packages "osmium>=4"
+          pip install -q --break-system-packages "osmium>=4" numpy contourpy shapely
           python3 tools/tag_mapping.py ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar tag-mapping.xml
       - name: Dane OSM PL + CZ + SK
         run: |
@@ -67,6 +67,16 @@ jobs:
               s, w, n, e = r['bbox']
               sub = f"{r['id']}.osm.pbf"
               subprocess.run(['osmium', 'extract', '-b', f'{w},{s},{e},{n}', '--set-bounds', 'all.osm.pbf', '-o', sub, '--overwrite'], check=True)
+              # Poziomice z danych wysokościowych + odchudzone kafle wysokości do cieniowania w aplikacji (out/<id>.dem.zip).
+              # Gdyby dane wysokości były niedostępne, mapa buduje się bez poziomic.
+              try:
+                  subprocess.run(['python3', 'tools/contours.py', str(s), str(w), str(n), str(e), 'contours.osm.pbf', 'hgt'], check=True)
+                  subprocess.run(['osmium', 'merge', sub, 'contours.osm.pbf', '-o', 'with-contours.osm.pbf', '--overwrite'], check=True)
+                  subprocess.run(['mv', 'with-contours.osm.pbf', sub], check=True)
+                  subprocess.run(f"cd hgt && zip -q -9 ../out/{r['id']}.dem.zip *.hgt", shell=True, check=True)
+              except subprocess.CalledProcessError as err:
+                  print('::warning::poziomice pominięte dla', r['id'], err)
+              subprocess.run('rm -rf hgt contours.osm.pbf', shell=True)
               subprocess.run(['osmosis', '--rbf', f'file={sub}', '--mapfile-writer', f"file=out/{r['id']}.map",
                               f'bbox={s},{w},{n},{e}', 'type=ram', 'threads=4', 'tag-conf-file=tag-mapping.xml',
                               'comment=MudNav - dane (c) OpenStreetMap, ODbL'], check=True)
@@ -77,7 +87,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: maps-ranges
-          path: out/*.map
+          path: |
+            out/*.map
+            out/*.dem.zip
           retention-days: 3
 
   countries:

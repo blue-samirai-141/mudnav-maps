@@ -18,6 +18,7 @@ def main(maps_dir, out, merge=None, url_base=None):
             if not os.path.exists(path):
                 print('brak', path)
                 continue
+            dem = os.path.join(maps_dir, r['id'] + '.dem.zip')
             regions.append({
                 'id': r['id'], 'name': r['name'], 'kind': kind, 'file': r['id'] + '.map',
                 'sizeBytes': os.path.getsize(path), 'sha256': sha256(path),
@@ -25,6 +26,10 @@ def main(maps_dir, out, merge=None, url_base=None):
                 # Niezmienny adres tej wersji (wydanie maps-<przebieg>): rozpoczęte pobieranie dokończy się,
                 # nawet gdy w międzyczasie wyjdą nowe mapy.
                 **({'url': url_base.rstrip('/') + '/' + r['id'] + '.map'} if url_base else {}),
+                # Dane wysokości do cieniowania rzeźby terenu (kafle HGT 3" w zipie) – opcjonalne.
+                **({'demFile': r['id'] + '.dem.zip', 'demSizeBytes': os.path.getsize(dem), 'demSha256': sha256(dem),
+                    **({'demUrl': url_base.rstrip('/') + '/' + r['id'] + '.dem.zip'} if url_base else {})}
+                   if os.path.exists(dem) else {}),
             })
     # Częściowa publikacja (np. same pasma): mapy niezbudowane teraz zostają z poprzedniego katalogu.
     if merge and os.path.exists(merge):
