@@ -36,6 +36,10 @@ ROCK_POIS = ''.join(
     for v, z in (('national_park', 8), ('landscape_park', 9), ('reserve', 12), ('natura2000', 11))
 ) + ''.join(
     f'        <osm-tag key="mn_dog" value="{v}" zoom-appear="9"/>\n' for v in ('zakaz_wstepu', 'na_smyczy', 'dozwolone')
+) + ''.join(
+    # Podpisy jezior z tools/water_labels.py: duże jeziora widać z daleka, stawy dopiero z bliska.
+    f'        <osm-tag key="mn_water_label" value="{v}" zoom-appear="{z}"/>\n'
+    for v, z in (('huge', 9), ('big', 11), ('medium', 13), ('small', 15))
 )
 # Schroniska bywają w OSM budynkiem (linią), nie punktem – domyślny zestaw zna je tylko jako punkty.
 HUTS = ''.join(

@@ -1,7 +1,8 @@
 name: Mapy offline
 
-# Co tydzień w czwartek w nocy (świeże mapy przed piątkowymi wyjściami na weekend) albo ręcznie: mapy Mapsforge z OpenStreetMap (Geofabrik)
-# – pasma górskie (małe pliki) i całe kraje PL/CZ/SK – w wydaniu „latest” razem z katalogiem maps.json.
+# Raz w miesiącu (1. dnia w nocy) albo ręcznie: mapy Mapsforge z OpenStreetMap (Geofabrik) – pasma górskie
+# (małe pliki) i całe kraje PL/CZ/SK – w wydaniu „latest” razem z katalogiem maps.json. Mapy zmieniają się wolno;
+# to, co zmienia się często (zamknięte szlaki, komunikaty), aplikacja pobiera osobno.
 on:
   workflow_dispatch:
     inputs:
@@ -10,10 +11,11 @@ on:
         type: boolean
         default: false
   schedule:
-    # Czwartek 01:41 UTC (02:41/03:41 w Polsce) – mapy są gotowe w czwartek rano.
-    - cron: "41 1 * * 4"
-  # Zmiana regionów albo workflow – od razu nowe mapy.
+    # 1. dzień miesiąca, 01:41 UTC.
+    - cron: "41 1 1 * *"
+  # Zmiana regionów albo workflow na main – od razu nowe mapy (gałęzie robocze nie budują).
   push:
+    branches: [main]
     paths:
       - "regions.json"
       - ".github/workflows/maps.yml"
@@ -94,13 +96,16 @@ jobs:
           python3 tools/trails.py hiking.osm.pbf trails.osm.pbf
           # Pomniki przyrody, wodospady, źródła rzek, kapliczki, wieże widokowe – patrz tools/extra_pois.py.
           osmium tags-filter raw.osm.pbf denotation=natural_monument waterway=waterfall natural=waterfall natural=spring \
-            historic=wayside_shrine,wayside_cross,memorial man_made=tower -o extra-src.osm.pbf
+            historic=wayside_shrine,wayside_cross,memorial man_made=tower w/waterway=stream,river -o extra-src.osm.pbf
           python3 tools/extra_pois.py extra-src.osm.pbf extra.osm.pbf
+          # Jeden podpis na jezioro (zamiast w każdym kaflu) – patrz tools/water_labels.py.
+          osmium tags-filter raw.osm.pbf nwr/natural=water nwr/landuse=reservoir,basin -o water-src.osm.pbf
+          python3 tools/water_labels.py water-src.osm.pbf water.osm.pbf
           # Parki narodowe i krajobrazowe, rezerwaty, Natura 2000 (relacje type=boundary) – patrz tools/protected.py.
           osmium tags-filter raw.osm.pbf r/boundary=national_park,protected_area r/leisure=nature_reserve -o prot-src.osm.pbf
           python3 tools/protected.py prot-src.osm.pbf prot.osm.pbf
-          osmium merge raw.osm.pbf trails.osm.pbf extra.osm.pbf prot.osm.pbf -o all.osm.pbf
-          rm raw.osm.pbf hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf prot-src.osm.pbf prot.osm.pbf
+          osmium merge raw.osm.pbf trails.osm.pbf extra.osm.pbf prot.osm.pbf water.osm.pbf -o all.osm.pbf
+          rm raw.osm.pbf hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf prot-src.osm.pbf prot.osm.pbf water-src.osm.pbf water.osm.pbf
       - name: Mapy pasm górskich
         env:
           JAVACMD_OPTIONS: -Xmx10g
@@ -163,7 +168,7 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq osmosis osmium-tool
           mkdir -p ~/.openstreetmap/osmosis/plugins
           curl -sSfL --retry 3 -o ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar "$WRITER"
-          pip install -q --break-system-packages "osmium>=4"
+          pip install -q --break-system-packages "osmium>=4" shapely
           python3 tools/tag_mapping.py ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar tag-mapping.xml
       - uses: actions/download-artifact@v4
         with:
@@ -185,8 +190,10 @@ jobs:
           osmium tags-filter in.osm.pbf r/route=hiking,foot -o hiking.osm.pbf
           python3 tools/trails.py hiking.osm.pbf trails.osm.pbf
           osmium tags-filter in.osm.pbf denotation=natural_monument waterway=waterfall natural=waterfall natural=spring \
-            historic=wayside_shrine,wayside_cross,memorial man_made=tower -o extra-src.osm.pbf
+            historic=wayside_shrine,wayside_cross,memorial man_made=tower w/waterway=stream,river -o extra-src.osm.pbf
           python3 tools/extra_pois.py extra-src.osm.pbf extra.osm.pbf
+          osmium tags-filter in.osm.pbf nwr/natural=water nwr/landuse=reservoir,basin -o water-src.osm.pbf
+          python3 tools/water_labels.py water-src.osm.pbf water.osm.pbf
           osmium tags-filter in.osm.pbf r/boundary=national_park,protected_area r/leisure=nature_reserve -o prot-src.osm.pbf
           python3 tools/protected.py prot-src.osm.pbf prot.osm.pbf
           # Zwykłe domy: sam obrys (building=yes), potem dobranie ich punktów z danych źródłowych.
@@ -195,9 +202,9 @@ jobs:
           osmium getid -r -I bways.osm.pbf bsrc.osm.pbf -o bfull.osm.pbf
           osmium cat bfull.osm.pbf -t node -o bnodes.osm.pbf
           rm in.osm.pbf bsrc.osm.pbf bfull.osm.pbf
-          osmium merge slim.osm.pbf trails.osm.pbf extra.osm.pbf prot.osm.pbf bnodes.osm.pbf bways.osm.pbf -o merged.osm.pbf --overwrite
+          osmium merge slim.osm.pbf trails.osm.pbf extra.osm.pbf prot.osm.pbf bnodes.osm.pbf bways.osm.pbf water.osm.pbf -o merged.osm.pbf --overwrite
           mv merged.osm.pbf slim.osm.pbf
-          rm hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf prot-src.osm.pbf prot.osm.pbf bnodes.osm.pbf bways.osm.pbf
+          rm hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf prot-src.osm.pbf prot.osm.pbf bnodes.osm.pbf bways.osm.pbf water-src.osm.pbf water.osm.pbf
           # Część kraju: wycinek prostokąta (bbox w regions.json: minLat,minLon,maxLat,maxLon; osmium chce lon,lat).
           IFS=, read -r s w n e <<< "${{ matrix.bbox }}"
           osmium extract -b "$w,$s,$e,$n" slim.osm.pbf -o part.osm.pbf --overwrite

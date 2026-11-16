@@ -163,7 +163,9 @@ def main(src, out):
                     continue
                 w.add_way(osmium.osm.mutable.Way(
                     id=OFFSET + wid * 4 + (i // 1900) % 4, version=ver, timestamp=ts, nodes=chunk,
-                    tags={f'trail_{c}': 'yes' for c in cols},
+                    # layer=5 (najwyższa warstwa Mapsforge): szlak zawsze nad drogami, także nad mostami i wiaduktami
+                    # (droga z layer=1 przykrywała czerwony szlak – wyglądało, jakby znikał i wracał).
+                    tags={**{f'trail_{c}': 'yes' for c in cols}, 'layer': '5'},
                 ))
                 n += 1
     print(f'szlaki: {len(ways)} dróg w relacjach, {len(parts)} odcinków połączonych w {n} linii')

@@ -8,11 +8,22 @@ Id punktów przesunięte o OFFSET (rosnąco), więc plik da się scalić `osmium
 Użycie: python3 extra_pois.py dane.osm.pbf wynik.osm.pbf
 """
 import datetime
+import math
 import sys
 
 import osmium
 
 OFFSET = 2 * 10 ** 12
+
+
+# Odcinek potoku nazwany jak wodospad (np. „Wodogrzmoty Mickiewicza” – w OSM to fragment Roztoki, a pojedyncze
+# progi to Wyżni/Pośredni/Niżni Wodogrzmot). Taka nazwa to „zespół wodospadów” – jeden punkt zamiast trzech.
+GROUP_WORDS = ('wodogrzmot', 'wodospad', 'vodopád', 'vodopad', 'kaskad', 'kaskád')
+GROUP_HIDES_M = 300
+
+
+def group_waterfall(t):
+    return t.get('waterway') in ('stream', 'river') and any(w in t.get('name', '').lower() for w in GROUP_WORDS)
 
 
 def kind(t):
@@ -33,8 +44,8 @@ def main(src, out):
     now = datetime.datetime.now(datetime.timezone.utc)
     found = []
     for o in osmium.FileProcessor(src).with_locations().with_filter(osmium.filter.EmptyTagFilter()):
-        k = kind(o.tags)
-        if not k:
+        k = 'waterfall_group' if o.is_way() and group_waterfall(o.tags) else kind(o.tags)
+        if not k or (k != 'waterfall_group' and o.is_way() and o.tags.get('waterway') in ('stream', 'river')):
             continue
         if o.is_node():
             loc = o.location
@@ -51,6 +62,15 @@ def main(src, out):
             if key in o.tags:
                 tags[key] = o.tags[key]
         found.append((lat, lon, tags))
+    groups = [(lat, lon) for lat, lon, t in found if t['mn_poi'] == 'waterfall_group']
+
+    def near_group(lat, lon):
+        k = math.cos(math.radians(lat)) * 111_320
+        return any(math.hypot((lat - a) * 111_320, (lon - b) * k) < GROUP_HIDES_M for a, b in groups)
+
+    # Pojedyncze progi przy zespole wypadają (na mapie i przy nazywaniu punktu trasy byłby „Niżni Wodogrzmot”).
+    found = [(lat, lon, {**t, 'mn_poi': 'waterfall'}) if t['mn_poi'] == 'waterfall_group' else (lat, lon, t)
+             for lat, lon, t in found if t['mn_poi'] != 'waterfall' or not near_group(lat, lon)]
     with osmium.SimpleWriter(out, overwrite=True) as w:
         for i, (lat, lon, tags) in enumerate(found):
             w.add_node(osmium.osm.mutable.Node(id=OFFSET + i + 1, version=1, timestamp=now, location=(lon, lat), tags=tags))
