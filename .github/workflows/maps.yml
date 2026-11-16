@@ -169,8 +169,9 @@ jobs:
         with:
           name: osm-${{ matrix.geofabrik }}
       - name: Odchudzenie danych
-        # Mapa kraju: tylko to, co rysuje mapa turystyczna. Bez zwykłych budynków i samych adresów (ok. połowa danych
-        # OSM) – zostają budynki z nazwą lub funkcją (schroniska, kościoły, sklepy). Pasma górskie mają pełne dane.
+        # Mapa kraju: tylko to, co rysuje mapa turystyczna. Budynki z nazwą lub funkcją (schroniska, kościoły, sklepy)
+        # zostają z pełnymi tagami; zwykłe domy jako sam obrys bez adresów i bez drobnicy (tools/buildings.py).
+        # Pasma górskie mają pełne dane.
         run: |
           # Dane pobrane raz w zadaniu „download” (artefakt osm-<kraj>).
           mv "${{ matrix.geofabrik }}.osm.pbf" in.osm.pbf
@@ -188,10 +189,15 @@ jobs:
           python3 tools/extra_pois.py extra-src.osm.pbf extra.osm.pbf
           osmium tags-filter in.osm.pbf r/boundary=national_park,protected_area r/leisure=nature_reserve -o prot-src.osm.pbf
           python3 tools/protected.py prot-src.osm.pbf prot.osm.pbf
-          rm in.osm.pbf
-          osmium merge slim.osm.pbf trails.osm.pbf extra.osm.pbf prot.osm.pbf -o merged.osm.pbf --overwrite
+          # Zwykłe domy: sam obrys (building=yes), potem dobranie ich punktów z danych źródłowych.
+          osmium tags-filter in.osm.pbf w/building -o bsrc.osm.pbf
+          python3 tools/buildings.py bsrc.osm.pbf bways.osm.pbf
+          osmium getid -r -I bways.osm.pbf bsrc.osm.pbf -o bfull.osm.pbf
+          osmium cat bfull.osm.pbf -t node -o bnodes.osm.pbf
+          rm in.osm.pbf bsrc.osm.pbf bfull.osm.pbf
+          osmium merge slim.osm.pbf trails.osm.pbf extra.osm.pbf prot.osm.pbf bnodes.osm.pbf bways.osm.pbf -o merged.osm.pbf --overwrite
           mv merged.osm.pbf slim.osm.pbf
-          rm hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf prot-src.osm.pbf prot.osm.pbf
+          rm hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf prot-src.osm.pbf prot.osm.pbf bnodes.osm.pbf bways.osm.pbf
           # Część kraju: wycinek prostokąta (bbox w regions.json: minLat,minLon,maxLat,maxLon; osmium chce lon,lat).
           IFS=, read -r s w n e <<< "${{ matrix.bbox }}"
           osmium extract -b "$w,$s,$e,$n" slim.osm.pbf -o part.osm.pbf --overwrite
