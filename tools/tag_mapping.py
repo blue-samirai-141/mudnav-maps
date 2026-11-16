@@ -22,6 +22,10 @@ ROCK_WAYS = ''.join(
 )
 ROCK_POIS = ''.join(
     f'        <osm-tag key="natural" value="{v}" zoom-appear="{z}"/>\n' for v, z in (('rock', 14), ('stone', 15))
+) + ''.join(
+    # Punkty z tools/extra_pois.py: pomniki przyrody, wodospady, źródła rzek, kapliczki, wieże widokowe.
+    f'        <osm-tag key="mn_poi" value="{v}" zoom-appear="{z}"/>\n'
+    for v, z in (('monument', 13), ('waterfall', 12), ('source', 12), ('shrine', 15), ('tower', 12))
 )
 # Schroniska bywają w OSM budynkiem (linią), nie punktem – domyślny zestaw zna je tylko jako punkty.
 HUTS = ''.join(
