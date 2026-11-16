@@ -40,7 +40,7 @@ def main(src, out):
         k = kind(r.tags)
         if k:
             rels.append((k, r.tags.get('name'), [m.ref for m in r.members if m.type == 'w' and m.role != 'inner'], DOG.get(r.tags.get('dog', ''))))
-    need = {ref for _, _, refs in rels for ref in refs}
+    need = {ref for _, _, refs, _ in rels for ref in refs}
     ways = {}
     for w in osmium.FileProcessor(src).with_locations().with_filter(osmium.filter.EntityFilter(osmium.osm.WAY)):
         if w.id in need:
