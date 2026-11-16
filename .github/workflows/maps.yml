@@ -85,7 +85,9 @@ jobs:
           export PS4='+ $(date -u +%H:%M:%S) '
           set -x
           ls -la *.osm.pbf
-          osmium merge poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf -o raw.osm.pbf
+          # Kraje pobrane o różnych porach mają te same punkty przy granicy w różnych wersjach – „merge” zostawiał
+          # oba (wycinanie pasm padało na „Node ID twice”); apply-changes zostawia najnowszą wersję każdego obiektu.
+          osmium apply-changes poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf -o raw.osm.pbf
           rm poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf
           # Szlaki turystyczne jako osobne linie z kolorem (trail_red=yes …) – patrz tools/trails.py.
           osmium tags-filter raw.osm.pbf r/route=hiking,foot -o hiking.osm.pbf
