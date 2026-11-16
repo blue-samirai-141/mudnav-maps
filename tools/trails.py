@@ -95,8 +95,10 @@ def main(src, out):
             continue
         if not all(nd.location.valid() for nd in way.nodes):
             continue
-        parts.append((way.id, tuple(sorted(cols)), [(nd.ref, nd.location.lat, nd.location.lon) for nd in way.nodes],
-                      max(way.version, 1), way.timestamp))
+        # Uproszczenie każdej drogi osobno (krótkie listy – szybko); końce zostają, więc łączenie dalej działa.
+        pts = [(nd.ref, nd.location.lat, nd.location.lon) for nd in way.nodes]
+        keep = set(simplify(pts))
+        parts.append((way.id, tuple(sorted(cols)), [p for p in pts if p[0] in keep], max(way.version, 1), way.timestamp))
     # Łączenie kolejnych odcinków o tych samych kolorach w długie linie – kreskowanie szlaku idzie wtedy równo,
     # a nie zaczyna się od nowa na każdym kawałku ulicy (szlaki w miastach wyglądały na poszarpane).
     merged = []
@@ -134,7 +136,7 @@ def main(src, out):
     n = 0
     with osmium.SimpleWriter(out, overwrite=True) as w:
         for wid, cols, line, ver, ts in sorted(merged, key=lambda m: m[0]):
-            nodes = simplify(line)
+            nodes = [p[0] for p in line]  # już uproszczone (dla całego połączonego szlaku byłoby za wolno)
             for i in range(0, len(nodes) - 1, 1900):
                 chunk = nodes[i:i + 1901]
                 if len(chunk) < 2:
