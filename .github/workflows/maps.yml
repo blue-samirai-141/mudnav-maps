@@ -58,8 +58,11 @@ jobs:
           osmium tags-filter raw.osm.pbf denotation=natural_monument waterway=waterfall natural=waterfall natural=spring \
             historic=wayside_shrine,wayside_cross,memorial man_made=tower -o extra-src.osm.pbf
           python3 tools/extra_pois.py extra-src.osm.pbf extra.osm.pbf
-          osmium merge raw.osm.pbf trails.osm.pbf extra.osm.pbf -o all.osm.pbf
-          rm raw.osm.pbf hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf
+          # Parki narodowe i krajobrazowe, rezerwaty, Natura 2000 (relacje type=boundary) – patrz tools/protected.py.
+          osmium tags-filter raw.osm.pbf r/boundary=national_park,protected_area r/leisure=nature_reserve -o prot-src.osm.pbf
+          python3 tools/protected.py prot-src.osm.pbf prot.osm.pbf
+          osmium merge raw.osm.pbf trails.osm.pbf extra.osm.pbf prot.osm.pbf -o all.osm.pbf
+          rm raw.osm.pbf hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf prot-src.osm.pbf prot.osm.pbf
       - name: Mapy pasm górskich
         env:
           JAVACMD_OPTIONS: -Xmx10g
@@ -147,10 +150,12 @@ jobs:
           osmium tags-filter in.osm.pbf denotation=natural_monument waterway=waterfall natural=waterfall natural=spring \
             historic=wayside_shrine,wayside_cross,memorial man_made=tower -o extra-src.osm.pbf
           python3 tools/extra_pois.py extra-src.osm.pbf extra.osm.pbf
+          osmium tags-filter in.osm.pbf r/boundary=national_park,protected_area r/leisure=nature_reserve -o prot-src.osm.pbf
+          python3 tools/protected.py prot-src.osm.pbf prot.osm.pbf
           rm in.osm.pbf
-          osmium merge slim.osm.pbf trails.osm.pbf extra.osm.pbf -o merged.osm.pbf --overwrite
+          osmium merge slim.osm.pbf trails.osm.pbf extra.osm.pbf prot.osm.pbf -o merged.osm.pbf --overwrite
           mv merged.osm.pbf slim.osm.pbf
-          rm hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf
+          rm hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf prot-src.osm.pbf prot.osm.pbf
           # Część kraju: wycinek prostokąta (bbox w regions.json: minLat,minLon,maxLat,maxLon; osmium chce lon,lat).
           IFS=, read -r s w n e <<< "${{ matrix.bbox }}"
           osmium extract -b "$w,$s,$e,$n" slim.osm.pbf -o part.osm.pbf --overwrite
