@@ -4,6 +4,11 @@ name: Mapy offline
 # – pasma górskie (małe pliki) i całe kraje PL/CZ/SK – w wydaniu „latest” razem z katalogiem maps.json.
 on:
   workflow_dispatch:
+    inputs:
+      only_ranges:
+        description: "Tylko pasma górskie (bez map krajów)"
+        type: boolean
+        default: false
   schedule:
     # Czwartek 01:41 UTC (02:41/03:41 w Polsce) – mapy są gotowe w czwartek rano.
     - cron: "41 1 * * 4"
@@ -40,7 +45,12 @@ jobs:
           pip install -q --break-system-packages "osmium>=4" numpy contourpy shapely
           python3 tools/tag_mapping.py ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar tag-mapping.xml
       - name: Dane OSM PL + CZ + SK
+        # Limit: zawieszony krok ma się szybko zakończyć błędem, a nie blokować publikację map na godzinę.
+        timeout-minutes: 45
         run: |
+          # Czas każdego polecenia w logu – widać, który etap trwa długo.
+          export PS4='+ $(date -u +%H:%M:%S) '
+          set -x
           for c in poland czech-republic slovakia; do
             for i in 1 2 3 4 5 6; do
               url="https://download.geofabrik.de/europe/$c-latest.osm.pbf"
@@ -101,6 +111,7 @@ jobs:
           retention-days: 3
 
   countries:
+    if: ${{ !inputs.only_ranges }}
     runs-on: ubuntu-latest
     timeout-minutes: 340
     strategy:
@@ -196,7 +207,7 @@ jobs:
   publish:
     needs: [ranges, countries, publish-ranges]
     # Kraje dokładamy, gdy są gotowe; pasma publikujemy nawet, gdy któryś kraj się nie zbudował.
-    if: always() && needs.ranges.result == 'success'
+    if: always() && needs.ranges.result == 'success' && !inputs.only_ranges
     uses: ./.github/workflows/publish.yml
     with:
       pattern: maps-*
