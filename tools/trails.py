@@ -65,24 +65,67 @@ def main(src, out):
         for m in rel.members:
             if m.type == 'w':
                 ways.setdefault(m.ref, set()).add(c)
+    # Odcinki szlaku: każda droga osobno (w mieście ulica bywa pocięta na dziesiątki krótkich kawałków).
+    parts = []
+    for way in osmium.FileProcessor(src).with_locations().with_filter(osmium.filter.EntityFilter(osmium.osm.WAY)):
+        cols = ways.get(way.id)
+        if not cols or len(way.nodes) < 2:
+            continue
+        # Trasy narciarskie wpisane do relacji szlaku (bez drogi/ścieżki) nie są szlakiem pieszym.
+        if 'piste:type' in way.tags and 'highway' not in way.tags:
+            continue
+        if not all(nd.location.valid() for nd in way.nodes):
+            continue
+        parts.append((way.id, tuple(sorted(cols)), [(nd.ref, nd.location.lat, nd.location.lon) for nd in way.nodes],
+                      max(way.version, 1), way.timestamp))
+    # Łączenie kolejnych odcinków o tych samych kolorach w długie linie – kreskowanie szlaku idzie wtedy równo,
+    # a nie zaczyna się od nowa na każdym kawałku ulicy (szlaki w miastach wyglądały na poszarpane).
+    merged = []
+    by_cols = {}
+    for p in parts:
+        by_cols.setdefault(p[1], []).append(p)
+    for cols, group in by_cols.items():
+        ends = {}
+        for idx, p in enumerate(group):
+            ends.setdefault(p[2][0][0], []).append(idx)
+            ends.setdefault(p[2][-1][0], []).append(idx)
+        used = [False] * len(group)
+        for idx, p in enumerate(group):
+            if used[idx]:
+                continue
+            used[idx] = True
+            line = list(p[2])
+            for forward in (True, False):
+                while True:
+                    tip = line[-1][0] if forward else line[0][0]
+                    nxt = next((k for k in ends.get(tip, []) if not used[k]), None)
+                    if nxt is None:
+                        break
+                    used[nxt] = True
+                    seg = group[nxt][2]
+                    if forward:  # dokładamy na końcu: odcinek ma zaczynać się w tip
+                        if seg[0][0] != tip:
+                            seg = seg[::-1]
+                        line = line + seg[1:]
+                    else:  # dokładamy na początku: odcinek ma kończyć się w tip
+                        if seg[-1][0] != tip:
+                            seg = seg[::-1]
+                        line = seg[:-1] + line
+            merged.append((p[0], cols, line, p[3], p[4]))
     n = 0
     with osmium.SimpleWriter(out, overwrite=True) as w:
-        for way in osmium.FileProcessor(src).with_locations().with_filter(osmium.filter.EntityFilter(osmium.osm.WAY)):
-            cols = ways.get(way.id)
-            if not cols or len(way.nodes) < 2:
-                continue
-            # Trasy narciarskie wpisane do relacji szlaku (bez drogi/ścieżki) nie są szlakiem pieszym.
-            if 'piste:type' in way.tags and 'highway' not in way.tags:
-                continue
-            tags = {f'trail_{c}': 'yes' for c in sorted(cols)}
-            # Wersja i czas jak w oryginale – osmosis odrzuca obiekty bez nich.
-            w.add_way(osmium.osm.mutable.Way(
-                id=OFFSET + way.id, version=max(way.version, 1), timestamp=way.timestamp,
-                nodes=simplify([(nd.ref, nd.location.lat, nd.location.lon) for nd in way.nodes if nd.location.valid()])
-                if all(nd.location.valid() for nd in way.nodes) else [nd.ref for nd in way.nodes], tags=tags,
-            ))
-            n += 1
-    print(f'szlaki: {len(ways)} dróg w relacjach, {n} linii szlaków')
+        for wid, cols, line, ver, ts in sorted(merged, key=lambda m: m[0]):
+            nodes = simplify(line)
+            for i in range(0, len(nodes) - 1, 1900):
+                chunk = nodes[i:i + 1901]
+                if len(chunk) < 2:
+                    continue
+                w.add_way(osmium.osm.mutable.Way(
+                    id=OFFSET + wid * 4 + (i // 1900) % 4, version=ver, timestamp=ts, nodes=chunk,
+                    tags={f'trail_{c}': 'yes' for c in cols},
+                ))
+                n += 1
+    print(f'szlaki: {len(ways)} dróg w relacjach, {len(parts)} odcinków połączonych w {n} linii')
 
 
 if __name__ == '__main__':
