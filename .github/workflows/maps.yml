@@ -52,7 +52,7 @@ jobs:
           osmium merge poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf -o raw.osm.pbf
           rm poland.osm.pbf czech-republic.osm.pbf slovakia.osm.pbf
           # Szlaki turystyczne jako osobne linie z kolorem (trail_red=yes …) – patrz tools/trails.py.
-          osmium tags-filter raw.osm.pbf r/route=hiking -o hiking.osm.pbf
+          osmium tags-filter raw.osm.pbf r/route=hiking,foot -o hiking.osm.pbf
           python3 tools/trails.py hiking.osm.pbf trails.osm.pbf
           # Pomniki przyrody, wodospady, źródła rzek, kapliczki, wieże widokowe – patrz tools/extra_pois.py.
           osmium tags-filter raw.osm.pbf denotation=natural_monument waterway=waterfall natural=waterfall natural=spring \
@@ -146,7 +146,7 @@ jobs:
             r/route r/boundary=administrative,national_park,protected_area r/type=multipolygon \
             -o slim.osm.pbf --overwrite
           # Szlaki turystyczne jako osobne linie z kolorem (trail_red=yes …) – patrz tools/trails.py.
-          osmium tags-filter in.osm.pbf r/route=hiking -o hiking.osm.pbf
+          osmium tags-filter in.osm.pbf r/route=hiking,foot -o hiking.osm.pbf
           python3 tools/trails.py hiking.osm.pbf trails.osm.pbf
           osmium tags-filter in.osm.pbf denotation=natural_monument waterway=waterfall natural=waterfall natural=spring \
             historic=wayside_shrine,wayside_cross,memorial man_made=tower -o extra-src.osm.pbf

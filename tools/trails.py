@@ -55,16 +55,35 @@ def color(tags):
 
 
 def main(src, out):
-    ways = {}
+    # Relacje szlaków bywają zagnieżdżone: długi szlak (np. Główny Szlak Beskidzki) dzieli się na etapy, a kolor
+    # (osmc:symbol) ma tylko relacja nadrzędna. Etap bez koloru dziedziczy go od rodzica – inaczej odpadał z mapy
+    # i szlak był urywany.
+    rels = {}
     for rel in osmium.FileProcessor(src, osmium.osm.RELATION):
-        if rel.tags.get('route') != 'hiking':
+        if rel.tags.get('route') not in ('hiking', 'foot'):
             continue
-        c = color(rel.tags)
+        rels[rel.id] = (color(rel.tags), [m.ref for m in rel.members if m.type == 'w'],
+                        [m.ref for m in rel.members if m.type == 'r'])
+    resolved = {rid: c for rid, (c, _, _) in rels.items() if c}
+    for _ in range(4):  # do czterech poziomów zagnieżdżenia
+        changed = False
+        for rid, (c, _, children) in rels.items():
+            pc = resolved.get(rid)
+            if not pc:
+                continue
+            for ch in children:
+                if ch in rels and ch not in resolved:
+                    resolved[ch] = pc
+                    changed = True
+        if not changed:
+            break
+    ways = {}
+    for rid, (_, members, _) in rels.items():
+        c = resolved.get(rid)
         if not c:
             continue
-        for m in rel.members:
-            if m.type == 'w':
-                ways.setdefault(m.ref, set()).add(c)
+        for ref in members:
+            ways.setdefault(ref, set()).add(c)
     # Odcinki szlaku: każda droga osobno (w mieście ulica bywa pocięta na dziesiątki krótkich kawałków).
     parts = []
     for way in osmium.FileProcessor(src).with_locations().with_filter(osmium.filter.EntityFilter(osmium.osm.WAY)):
