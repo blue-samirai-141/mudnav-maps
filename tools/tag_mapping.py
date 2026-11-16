@@ -15,6 +15,14 @@ CONTOURS = ''.join(
     f'        <osm-tag key="mn_contour" value="{v}" zoom-appear="{z}"/>\n'
     for v, z in (('100', 11), ('50', 12), ('20', 13), ('10', 15))
 )
+# Skały, ostańce, urwiska, granie i grzędy – domyślny zestaw ich nie zapisuje, a w górach to ważna część mapy.
+ROCK_WAYS = ''.join(
+    f'        <osm-tag key="natural" value="{v}" zoom-appear="{z}"/>\n'
+    for v, z in (('bare_rock', 11), ('rock', 13), ('stone', 15), ('cliff', 13), ('arete', 12), ('ridge', 12))
+)
+ROCK_POIS = ''.join(
+    f'        <osm-tag key="natural" value="{v}" zoom-appear="{z}"/>\n' for v, z in (('rock', 14), ('stone', 15))
+)
 # Schroniska bywają w OSM budynkiem (linią), nie punktem – domyślny zestaw zna je tylko jako punkty.
 HUTS = ''.join(
     f'        <osm-tag key="tourism" value="{v}" zoom-appear="11"/>\n' for v in ('alpine_hut', 'wilderness_hut')
@@ -22,6 +30,6 @@ HUTS = ''.join(
 
 xml = zipfile.ZipFile(sys.argv[1]).read('tag-mapping.xml').decode('utf-8')
 at = xml.rindex('</tag-mapping>')
-xml = xml[:at] + '    <!-- MudNav: szlaki turystyczne, poziomice, schroniska-budynki -->\n    <ways>\n' + TRAILS + CONTOURS + (HUTS if 'key="tourism" value="alpine_hut"' not in xml[xml.find('<ways>'):] else '') + '    </ways>\n' + xml[at:]
+xml = xml[:at] + '    <!-- MudNav: skały -->\n    <pois>\n' + ROCK_POIS + '    </pois>\n' + '    <!-- MudNav: szlaki turystyczne, poziomice, schroniska-budynki, skały -->\n    <ways>\n' + TRAILS + CONTOURS + ROCK_WAYS + (HUTS if 'key="tourism" value="alpine_hut"' not in xml[xml.find('<ways>'):] else '') + '    </ways>\n' + xml[at:]
 open(sys.argv[2], 'w', encoding='utf-8').write(xml)
 print('tag-mapping ze szlakami i poziomicami:', sys.argv[2])
