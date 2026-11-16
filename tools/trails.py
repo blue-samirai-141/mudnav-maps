@@ -46,11 +46,28 @@ COLORS = ('red', 'blue', 'green', 'yellow', 'black')
 OFFSET = 10 ** 12
 
 
+# Ścieżki dydaktyczne, edukacyjne, przyrodnicze i spacerowe – w OSM też bywają „czerwone”, ale to nie szlaki PTTK
+# (Mapa Turystyczna i papierowe mapy ich nie rysują). Bez nich na mapie nie ma fałszywych „szlaków czerwonych”.
+THEMATIC = ('ścieżka', 'sciezka', 'dydakty', 'edukacyj', 'przyrodnicz', 'spacerow', 'historyczn', 'náučn', 'naučn',
+            'chodník', 'educational', 'lehrpfad')
+
+
 def color(tags):
+    """Kolor szlaku znakowanego (PTTK / KČT / KST): znak „pasek” w osmc:symbol (np. red:white:red_bar).
+    Inne znaki (kropka, ukośnik, róg…) to szlaki tematyczne i ścieżki – pomijamy."""
+    name = tags.get('name', '').lower()
+    if any(w in name for w in THEMATIC) or tags.get('educational') == 'yes':
+        return None
     sym = tags.get('osmc:symbol', '')
-    c = sym.split(':', 1)[0].strip().lower() if sym else ''
-    if c not in COLORS:
-        c = tags.get('colour', '').strip().lower()
+    if sym:
+        parts = sym.split(':')
+        c = parts[0].strip().lower()
+        fg = parts[2].strip().lower() if len(parts) > 2 else ''
+        if fg and not (fg.endswith('_bar') or fg.endswith('_stripe')):
+            return None
+        if c in COLORS:
+            return c
+    c = tags.get('colour', '').strip().lower()
     return c if c in COLORS else None
 
 
@@ -59,11 +76,14 @@ def main(src, out):
     # (osmc:symbol) ma tylko relacja nadrzędna. Etap bez koloru dziedziczy go od rodzica – inaczej odpadał z mapy
     # i szlak był urywany.
     rels = {}
+    thematic = set()  # ścieżki tematyczne – nie dziedziczą koloru od szlaku nadrzędnego
     for rel in osmium.FileProcessor(src, osmium.osm.RELATION):
         if rel.tags.get('route') not in ('hiking', 'foot'):
             continue
         rels[rel.id] = (color(rel.tags), [m.ref for m in rel.members if m.type == 'w'],
                         [m.ref for m in rel.members if m.type == 'r'])
+        if any(w in rel.tags.get('name', '').lower() for w in THEMATIC):
+            thematic.add(rel.id)
     resolved = {rid: c for rid, (c, _, _) in rels.items() if c}
     for _ in range(4):  # do czterech poziomów zagnieżdżenia
         changed = False
@@ -72,7 +92,7 @@ def main(src, out):
             if not pc:
                 continue
             for ch in children:
-                if ch in rels and ch not in resolved:
+                if ch in rels and ch not in resolved and ch not in thematic:
                     resolved[ch] = pc
                     changed = True
         if not changed:
