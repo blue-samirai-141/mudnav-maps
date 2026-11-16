@@ -81,12 +81,14 @@ def main(src, out):
     # (osmc:symbol) ma tylko relacja nadrzędna. Etap bez koloru dziedziczy go od rodzica – inaczej odpadał z mapy
     # i szlak był urywany.
     rels = {}
+    names = {}
     thematic = set()  # ścieżki tematyczne – nie dziedziczą koloru od szlaku nadrzędnego
     for rel in osmium.FileProcessor(src, osmium.osm.RELATION):
         if rel.tags.get('route') not in ('hiking', 'foot'):
             continue
         rels[rel.id] = (color(rel.tags), [m.ref for m in rel.members if m.type == 'w'],
                         [m.ref for m in rel.members if m.type == 'r'])
+        names[rel.id] = rel.tags.get('name', '')
         if any(w in rel.tags.get('name', '').lower() for w in THEMATIC):
             thematic.add(rel.id)
     resolved = {rid: c for rid, (c, _, _) in rels.items() if c}
@@ -141,7 +143,10 @@ def main(src, out):
     for rid in umbrella:
         resolved.pop(rid, None)
     if umbrella:
+        # Lista w logu budowy – do przejrzenia, czy reguła nie zabrała prawdziwego szlaku.
         print('trasy bez własnych znaków (pominięte):', len(umbrella))
+        for rid in sorted(umbrella, key=lambda r: -len(rels[r][1])):
+            print(f'  r{rid} {len(rels[rid][1])} dróg  {names.get(rid, "")}')
     ways = {}
     for rid, (_, members, _) in rels.items():
         c = resolved.get(rid)
