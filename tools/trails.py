@@ -56,6 +56,7 @@ THEMATIC = ('ścieżka', 'sciezka', 'dydakty', 'edukacyj', 'przyrodnicz', 'space
 UMBRELLA_MIN_WAYS = 20
 UMBRELLA_SHARE = 0.7
 UMBRELLA_MIN_OTHERS = 3
+KCT = re.compile(r'^\[(Č|M|Z|Ž|C|K|BK|R)\]')
 SUPER = re.compile(r'(?i)european long distance|fernwanderweg|eisenach|budape|\bE ?\d{1,2}\b')
 
 
@@ -84,6 +85,7 @@ def main(src, out):
     # i szlak był urywany.
     rels = {}
     names = {}
+    kct = set()
     super_routes = set()  # trasy międzynarodowe (E3, E8, Eisenach–Budapeszt…) – nigdy nie „zasłaniają” zwykłego szlaku
     thematic = set()  # ścieżki tematyczne – nie dziedziczą koloru od szlaku nadrzędnego
     for rel in osmium.FileProcessor(src, osmium.osm.RELATION):
@@ -92,6 +94,9 @@ def main(src, out):
         rels[rel.id] = (color(rel.tags), [m.ref for m in rel.members if m.type == 'w'],
                         [m.ref for m in rel.members if m.type == 'r'])
         names[rel.id] = rel.tags.get('name', '')
+        # Czeskie szlaki KČT mają w nazwie znak koloru: „[Č] Strakonice - Mařský vrch” – to zawsze szlak ze znakami.
+        if KCT.match(rel.tags.get('name', '')):
+            kct.add(rel.id)
         if rel.tags.get('network') == 'iwn' or SUPER.search(rel.tags.get('name', '')):
             super_routes.add(rel.id)
         if any(w in rel.tags.get('name', '').lower() for w in THEMATIC):
@@ -126,7 +131,7 @@ def main(src, out):
         best = None
         for rid, (_, members, _) in rels.items():
             c = resolved.get(rid)
-            if not c or rid in umbrella or len(members) < UMBRELLA_MIN_WAYS:
+            if not c or rid in umbrella or rid in kct or len(members) < UMBRELLA_MIN_WAYS:
                 continue
             others = set()
             shared = 0
