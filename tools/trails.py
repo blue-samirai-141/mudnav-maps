@@ -52,6 +52,11 @@ THEMATIC = ('ścieżka', 'sciezka', 'dydakty', 'edukacyj', 'przyrodnicz', 'space
             'chodník', 'educational', 'lehrpfad')
 
 
+UMBRELLA_MIN_WAYS = 20
+UMBRELLA_SHARE = 0.7
+UMBRELLA_MIN_OTHERS = 3
+
+
 def color(tags):
     """Kolor szlaku znakowanego (PTTK / KČT / KST): znak „pasek” w osmc:symbol (np. red:white:red_bar).
     Inne znaki (kropka, ukośnik, róg…) to szlaki tematyczne i ścieżki – pomijamy."""
@@ -97,6 +102,46 @@ def main(src, out):
                     changed = True
         if not changed:
             break
+    # Trasy „parasolowe” (np. Główny Szlak Beskidu Wyspowego „Beskidzkie Wyspy”, 320 km) nie mają własnych znaków –
+    # prowadzą istniejącymi szlakami niebieskimi, żółtymi, zielonymi. W OSM mają jednak kolor (czerwony) i malowały
+    # cudze szlaki na czerwono. Poznajemy je po tym, że prawie cały przebieg biegnie po szlakach innego koloru.
+    # Usuwamy po jednej: zawsze tę, która biegnie po największej liczbie innych szlaków (trasa parasolowa prowadzi
+    # po kilkunastu), i liczymy od nowa – zwykły szlak przestaje wtedy wyglądać na „schowany” pod parasolową.
+    umbrella = set()
+    while True:
+        on_ways = {}
+        for rid, (_, members, _) in rels.items():
+            c = resolved.get(rid)
+            if c and rid not in umbrella:
+                for ref in members:
+                    on_ways.setdefault(ref, []).append((rid, c))
+        best = None
+        for rid, (_, members, _) in rels.items():
+            c = resolved.get(rid)
+            if not c or rid in umbrella or len(members) < UMBRELLA_MIN_WAYS:
+                continue
+            others = set()
+            shared = 0
+            for ref in members:
+                o = {r for r, oc in on_ways.get(ref, []) if oc != c}
+                if o:
+                    shared += 1
+                    others |= o
+            if shared >= UMBRELLA_SHARE * len(members) and len(others) >= UMBRELLA_MIN_OTHERS:
+                if best is None or len(others) > best[1]:
+                    best = (rid, len(others))
+        if best is None:
+            break
+        umbrella.add(best[0])
+    # Etapy trasy parasolowej (kolor odziedziczony po niej) też odpadają.
+    for rid in list(umbrella):
+        for ch in rels[rid][2]:
+            if ch in resolved and not rels.get(ch, (None,))[0]:
+                umbrella.add(ch)
+    for rid in umbrella:
+        resolved.pop(rid, None)
+    if umbrella:
+        print('trasy bez własnych znaków (pominięte):', len(umbrella))
     ways = {}
     for rid, (_, members, _) in rels.items():
         c = resolved.get(rid)
