@@ -68,6 +68,7 @@ jobs:
           JAVACMD_OPTIONS: -Xmx10g
         run: |
           mkdir -p out
+          # label-position=true: jedno miejsce na nazwę obszaru (jeziora, parki) – bez tego nazwa powtarzała się w każdym kaflu.
           python3 - <<'PY'
           import json, subprocess
           for r in json.load(open('regions.json', encoding='utf-8'))['ranges']:
@@ -85,7 +86,7 @@ jobs:
                   print('::warning::poziomice pominięte dla', r['id'], err)
               subprocess.run('rm -rf hgt contours.osm.pbf', shell=True)
               subprocess.run(['osmosis', '--rbf', f'file={sub}', '--mapfile-writer', f"file=out/{r['id']}.map",
-                              f'bbox={s},{w},{n},{e}', 'type=ram', 'threads=4', 'tag-conf-file=tag-mapping.xml',
+                              f'bbox={s},{w},{n},{e}', 'type=ram', 'threads=4', 'tag-conf-file=tag-mapping.xml', 'label-position=true',
                               'comment=MudNav - dane (c) OpenStreetMap, ODbL'], check=True)
               subprocess.run(['rm', sub], check=True)
               print(r['id'], 'gotowe')
@@ -168,7 +169,7 @@ jobs:
           mkdir -p out
           write() {
             osmosis --rbf file=slim.osm.pbf --mapfile-writer file=out/${{ matrix.id }}.map type=$1 threads=4 \
-              ${{ matrix.bbox && format('bbox={0}', matrix.bbox) || '' }} tag-conf-file=tag-mapping.xml \
+              ${{ matrix.bbox && format('bbox={0}', matrix.bbox) || '' }} tag-conf-file=tag-mapping.xml label-position=true \
               skip-invalid-relations=true "comment=MudNav - dane (c) OpenStreetMap, ODbL"
           }
           start=$(date +%s)
