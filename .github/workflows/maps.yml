@@ -55,7 +55,7 @@ jobs:
             for i in 1 2 3 4 5 6; do
               url="https://download.geofabrik.de/europe/$c-latest.osm.pbf"
               [ $((i % 2)) = 0 ] && url="https://download.openstreetmap.fr/extracts/europe/${c//-/_}-latest.osm.pbf"
-              curl -sSfL --retry 2 --retry-all-errors -o "$c.osm.pbf" "$url" && break
+              curl -sSfL --retry 2 --retry-all-errors --connect-timeout 30 --speed-limit 100000 --speed-time 60 --max-time 1800 -o "$c.osm.pbf" "$url" && break
               [ $i = 6 ] && exit 1; sleep 30
             done
           done
@@ -147,7 +147,7 @@ jobs:
             url="https://download.geofabrik.de/europe/$name-latest.osm.pbf"
             [ $((i % 2)) = 0 ] && url="$mirror"
             echo "Próba $i: $url"
-            curl -sSfL --retry 2 --retry-all-errors -o in.osm.pbf "$url" && break
+            curl -sSfL --retry 2 --retry-all-errors --connect-timeout 30 --speed-limit 100000 --speed-time 60 --max-time 1800 -o in.osm.pbf "$url" && break
             [ $i = 6 ] && exit 1; sleep 30
           done
           osmium tags-filter in.osm.pbf \
