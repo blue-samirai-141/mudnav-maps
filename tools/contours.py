@@ -103,9 +103,9 @@ def main(s, w, n, e, out, hgt_out=None):
         for ele, xy in lines:
             ids = list(range(node + 1, node + 1 + len(xy)))
             node += len(xy)
-            closed = len(xy) > 3 and xy[0][0] == xy[-1][0] and xy[0][1] == xy[-1][1]
-            if closed:
-                ids[-1] = ids[0]
+            # Poziomica zamknięta w pętlę ZOSTAJE otwartą linią (ostatni punkt to osobny węzeł w tym samym miejscu):
+            # zamkniętą drogę zapis mapy traktuje jak obszar i przycina do kafli z prostymi bokami – na mapie
+            # wychodziła siatka kwadratów z podpisami wysokości w złych miejscach.
             # Mapsforge przyjmuje linie do 2000 punktów bez problemu – dłuższe tniemy.
             for i in range(0, len(ids) - 1, 1900):
                 part = ids[i:i + 1901]
