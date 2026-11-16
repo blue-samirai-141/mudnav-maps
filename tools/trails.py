@@ -9,6 +9,7 @@ Użycie: python3 trails.py hiking.osm.pbf trails.osm.pbf
 (hiking.osm.pbf = osmium tags-filter dane.osm.pbf r/route=hiking – relacje z drogami)
 """
 import math
+import re
 import sys
 
 import osmium
@@ -55,6 +56,7 @@ THEMATIC = ('ścieżka', 'sciezka', 'dydakty', 'edukacyj', 'przyrodnicz', 'space
 UMBRELLA_MIN_WAYS = 20
 UMBRELLA_SHARE = 0.7
 UMBRELLA_MIN_OTHERS = 3
+SUPER = re.compile(r'(?i)european long distance|fernwanderweg|eisenach|budape|\bE ?\d{1,2}\b')
 
 
 def color(tags):
@@ -82,6 +84,7 @@ def main(src, out):
     # i szlak był urywany.
     rels = {}
     names = {}
+    super_routes = set()  # trasy międzynarodowe (E3, E8, Eisenach–Budapeszt…) – nigdy nie „zasłaniają” zwykłego szlaku
     thematic = set()  # ścieżki tematyczne – nie dziedziczą koloru od szlaku nadrzędnego
     for rel in osmium.FileProcessor(src, osmium.osm.RELATION):
         if rel.tags.get('route') not in ('hiking', 'foot'):
@@ -89,6 +92,8 @@ def main(src, out):
         rels[rel.id] = (color(rel.tags), [m.ref for m in rel.members if m.type == 'w'],
                         [m.ref for m in rel.members if m.type == 'r'])
         names[rel.id] = rel.tags.get('name', '')
+        if rel.tags.get('network') == 'iwn' or SUPER.search(rel.tags.get('name', '')):
+            super_routes.add(rel.id)
         if any(w in rel.tags.get('name', '').lower() for w in THEMATIC):
             thematic.add(rel.id)
     resolved = {rid: c for rid, (c, _, _) in rels.items() if c}
@@ -109,7 +114,8 @@ def main(src, out):
     # cudze szlaki na czerwono. Poznajemy je po tym, że prawie cały przebieg biegnie po szlakach innego koloru.
     # Usuwamy po jednej: zawsze tę, która biegnie po największej liczbie innych szlaków (trasa parasolowa prowadzi
     # po kilkunastu), i liczymy od nowa – zwykły szlak przestaje wtedy wyglądać na „schowany” pod parasolową.
-    umbrella = set()
+    # Trasy międzynarodowe (E3, E8, Eisenach–Budapeszt) w PL/CZ/SK nie mają własnych znaków – idą szlakami krajowymi.
+    umbrella = {rid for rid in super_routes if rid in resolved}
     while True:
         on_ways = {}
         for rid, (_, members, _) in rels.items():
@@ -124,8 +130,11 @@ def main(src, out):
                 continue
             others = set()
             shared = 0
+            # Liczą się tylko krótsze szlaki innego koloru (trasa parasolowa biegnie po wielu krótszych; zwykły szlak,
+            # po którym idzie dłuższa trasa międzynarodowa, nie jest przez nią „zasłonięty”) i nie trasy międzynarodowe.
+            size = len(members)
             for ref in members:
-                o = {r for r, oc in on_ways.get(ref, []) if oc != c}
+                o = {r for r, oc in on_ways.get(ref, []) if oc != c and r not in super_routes and len(rels[r][1]) < size}
                 if o:
                     shared += 1
                     others |= o
