@@ -1,0 +1,17 @@
+{
+  "region": {"id": "tatry-zakopane", "bbox": [49.15, 19.75, 49.33, 20.25]},
+  "routes": [
+    {"name": "Kuźnice → Kasprowy Wierch", "points": [[49.2705, 19.9810], [49.2318, 19.9816]]},
+    {"name": "Palenica Białczańska → Morskie Oko", "points": [[49.2547, 20.1036], [49.2015, 20.0713]]},
+    {"name": "Kuźnice → Giewont", "points": [[49.2705, 19.9810], [49.2510, 19.9341]]},
+    {"name": "Kalatówki → Murowaniec", "points": [[49.2594, 19.9666], [49.2434, 20.0072]]},
+    {"name": "Kiry → Hala Ornak", "points": [[49.2775, 19.8643], [49.2291, 19.8587]]},
+    {"name": "Palenica → Dolina Pięciu Stawów", "points": [[49.2547, 20.1036], [49.2136, 20.0487]]},
+    {"name": "Kuźnice → Nosal", "points": [[49.2705, 19.9810], [49.2764, 19.9895]]},
+    {"name": "Morskie Oko → Rysy", "points": [[49.2015, 20.0713], [49.1795, 20.0881]]},
+    {"name": "Zakopane dworzec → Kuźnice (miasto)", "points": [[49.3001, 19.9590], [49.2705, 19.9810]]},
+    {"name": "Krupówki → Gubałówka dolna stacja (miasto)", "points": [[49.2967, 19.9504], [49.3000, 19.9440]]},
+    {"name": "Krupówki → Kalatówki", "points": [[49.2967, 19.9504], [49.2594, 19.9666]]},
+    {"name": "Kuźnice → Murowaniec", "points": [[49.2705, 19.9810], [49.2434, 20.0072]]}
+  ]
+}

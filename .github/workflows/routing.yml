@@ -1,0 +1,51 @@
+name: Graf tras (silnik MudNav)
+
+# Ręcznie: graf dróg pieszych dla silnika tras MudNav (próba: Tatry + Zakopane) i trasy wzorcowe z BRoutera
+# do porównania. Wynik w wydaniu „routing” (graf pobiera aplikacja z włączonym „Nowym silnikiem tras”).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  graph:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Narzędzia
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+          pip install -q --break-system-packages "osmium>=4" numpy contourpy shapely
+      - name: Dane OSM (Małopolska + Słowacja)
+        run: |
+          for c in poland/malopolskie slovakia; do
+            f="$(basename $c).osm.pbf"
+            for i in 1 2 3 4; do
+              curl -sSfL --retry 2 --connect-timeout 30 --max-time 1800 -o "$f" "https://download.geofabrik.de/europe/$c-latest.osm.pbf" && break
+              [ $i = 4 ] && exit 1; sleep 30
+            done
+            ls -la "$f"
+          done
+      - name: Graf
+        run: |
+          read id s w n e < <(python3 -c "import json;c=json.load(open('routing-tests.json'))['region'];print(c['id'],*c['bbox'])")
+          osmium extract -b "$w,$s,$e,$n" malopolskie.osm.pbf -o pl.osm.pbf
+          osmium extract -b "$w,$s,$e,$n" slovakia.osm.pbf -o sk.osm.pbf
+          osmium merge pl.osm.pbf sk.osm.pbf -o region.osm.pbf
+          mkdir -p out
+          python3 tools/walkgraph.py region.osm.pbf $s $w $n $e "out/$id.walk.gz"
+      - name: Trasy wzorcowe (BRouter)
+        run: python3 tools/brouter_ref.py routing-tests.json out/brouter
+      - name: Publikacja (wydanie „routing”)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp routing-tests.json out/
+          (cd out && zip -q -r brouter-ref.zip brouter routing-tests.json)
+          if ! gh release view routing >/dev/null 2>&1; then
+            gh release create routing --latest=false --title "Silnik tras MudNav – grafy (beta)" \
+              --notes "Grafy dróg pieszych dla nowego silnika tras (próba) i trasy wzorcowe BRoutera."
+          fi
+          gh release upload routing out/*.walk.gz out/brouter-ref.zip --clobber
