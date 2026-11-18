@@ -44,6 +44,18 @@ def simplify(pts, tol=TOLERANCE_M):
     return [p[0] for p, k in zip(pts, keep) if k]
 
 COLORS = ('red', 'blue', 'green', 'yellow', 'black')
+
+# Pas szlaku w półpasach od osi drogi: m4…m1 w lewo, 0 – na osi, p1…p4 w prawo. Szlak idący drogą sam leży
+# dokładnie na niej (wcześniej każdy kolor miał stały pas, jakby obok zawsze szło pięć szlaków – żółty biegł
+# kilka metrów obok ścieżki i obok wyznaczonej trasy, a na zygzakach przesunięta linia robiła pętle).
+LANES = ('m4', 'm3', 'm2', 'm1', '0', 'p1', 'p2', 'p3', 'p4')
+
+
+def trail_tags(cols):
+    """{trail_kolor: pas} – kolory w stałej kolejności, rozłożone symetrycznie wokół osi drogi."""
+    ordered = [c for c in COLORS if c in cols]
+    n = len(ordered)
+    return {f'trail_{c}': LANES[4 + 2 * i - (n - 1)] for i, c in enumerate(ordered)}
 OFFSET = 10 ** 12
 
 
@@ -229,7 +241,7 @@ def main(src, out):
                     id=OFFSET + wid * 4 + (i // 1900) % 4, version=ver, timestamp=ts, nodes=chunk,
                     # layer=5 (najwyższa warstwa Mapsforge): szlak zawsze nad drogami, także nad mostami i wiaduktami
                     # (droga z layer=1 przykrywała czerwony szlak – wyglądało, jakby znikał i wracał).
-                    tags={**{f'trail_{c}': 'yes' for c in cols}, 'layer': '5'},
+                    tags={**trail_tags(cols), 'layer': '5'},
                 ))
                 n += 1
     print(f'szlaki: {len(ways)} dróg w relacjach, {len(parts)} odcinków połączonych w {n} linii')

@@ -6,8 +6,10 @@ import sys
 import zipfile
 
 TRAILS = ''.join(
-    f'        <osm-tag key="trail_{c}" value="yes" zoom-appear="11"/>\n'
+    f'        <osm-tag key="trail_{c}" value="{v}" zoom-appear="11"/>\n'
     for c in ('red', 'blue', 'green', 'yellow', 'black')
+    # Pas szlaku (tools/trails.py: LANES); „yes” – starsze dane bez pasów.
+    for v in ('yes', 'm4', 'm3', 'm2', 'm1', '0', 'p1', 'p2', 'p3', 'p4')
 )
 
 # Poziomice z tools/contours.py: co 100 m widać najwcześniej, co 10 m dopiero w dużym zbliżeniu.
