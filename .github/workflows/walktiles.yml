@@ -1,0 +1,129 @@
+name: Kafle tras (silnik MudNav)
+
+# Graf dróg pieszych w kaflach 0,5° (tools/walktiles.py) dla Polski, Czech i Słowacji – miasta, lasy i góry.
+# Aplikacja pobiera kafle swoich map i dociąga brakujące w trakcie liczenia trasy. Wynik w wydaniu „walk-tiles”
+# (pliki *.mnwt + katalog walk-tiles.json z rozmiarami i sumami kontrolnymi).
+on:
+  workflow_dispatch:
+  schedule:
+    # Co miesiąc, dzień po mapach.
+    - cron: "17 3 2 * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: walktiles
+  cancel-in-progress: false
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        country: [poland, czech-republic, slovakia]
+    steps:
+      - name: Pobranie ${{ matrix.country }}
+        run: |
+          c="${{ matrix.country }}"
+          for i in 1 2 3 4 5 6; do
+            url="https://download.geofabrik.de/europe/$c-latest.osm.pbf"
+            [ $((i % 2)) = 0 ] && url="https://download.openstreetmap.fr/extracts/europe/${c//-/_}-latest.osm.pbf"
+            echo "$(date -u +%T) próba $i: $url"
+            curl -sSfL --retry 2 --retry-all-errors --connect-timeout 30 --speed-limit 100000 --speed-time 60 --max-time 3000 -o "$c.osm.pbf" "$url" && break
+            [ $i = 6 ] && exit 1; sleep 30
+          done
+          ls -la "$c.osm.pbf"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: osm-${{ matrix.country }}
+          path: ${{ matrix.country }}.osm.pbf
+          retention-days: 1
+          compression-level: 0
+
+  tiles:
+    needs: download
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pasy szerokości (wyrównane do 0,5°) – każdy osobnym zadaniem, równolegle.
+        band: ["47.5,49.5", "49.5,51.0", "51.0,52.5", "52.5,55.0"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Narzędzia
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+          pip install -q --break-system-packages "osmium>=4" numpy contourpy shapely
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: osm-*
+          merge-multiple: true
+      - name: Kafle pasa ${{ matrix.band }}
+        run: |
+          export PS4='+ $(date -u +%H:%M:%S) '
+          set -x
+          IFS=, read S N <<< "${{ matrix.band }}"
+          W=12.0; E=24.5
+          # Margines: drogi przecinające brzeg pasa muszą być całe (węzły brzegowe kafli).
+          bs=$(python3 -c "print($S-0.05)"); bn=$(python3 -c "print($N+0.05)")
+          for c in poland czech-republic slovakia; do
+            osmium extract -b "$W,$bs,$E,$bn" -s complete_ways "$c.osm.pbf" -o "band-$c.osm.pbf" --overwrite
+            rm "$c.osm.pbf"
+          done
+          # Kraje pobrane o różnych porach – apply-changes zostawia najnowszą wersję obiektów z pogranicza.
+          osmium apply-changes band-poland.osm.pbf band-czech-republic.osm.pbf band-slovakia.osm.pbf -o band.osm.pbf
+          rm band-*.osm.pbf
+          mkdir -p tiles
+          lat=$S
+          while python3 -c "import sys; sys.exit(0 if $lat < $N - 1e-9 else 1)"; do
+            top=$(python3 -c "print($lat+0.5)")
+            ss=$(python3 -c "print($lat-0.05)"); sn=$(python3 -c "print($top+0.05)")
+            osmium extract -b "$W,$ss,$E,$sn" -s complete_ways band.osm.pbf -o strip.osm.pbf --overwrite
+            python3 tools/walktiles.py osm strip.osm.pbf "$lat" "$W" "$top" "$E" tiles
+            lat=$top
+          done
+          ls tiles | wc -l; du -sh tiles
+      - uses: actions/upload-artifact@v4
+        with:
+          name: walktiles-${{ strategy.job-index }}
+          path: tiles/*.mnwt
+          retention-days: 3
+
+  publish:
+    needs: tiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: walktiles-*
+          path: tiles
+          merge-multiple: true
+      - name: Katalog i wydanie „walk-tiles”
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import datetime, hashlib, json, os
+          tiles = []
+          for f in sorted(os.listdir('tiles')):
+              if not f.endswith('.mnwt'):
+                  continue
+              p = os.path.join('tiles', f)
+              tiles.append({'name': f[:-5], 'sizeBytes': os.path.getsize(p),
+                            'sha256': hashlib.sha256(open(p, 'rb').read()).hexdigest()})
+          json.dump({'generated': datetime.date.today().isoformat(), 'tileSize': 0.5, 'tiles': tiles},
+                    open('walk-tiles.json', 'w'), indent=1)
+          print(len(tiles), 'kafli,', sum(t['sizeBytes'] for t in tiles) / 1e6, 'MB')
+          PY
+          if ! gh release view walk-tiles >/dev/null 2>&1; then
+            gh release create walk-tiles --latest=false --title "Silnik tras MudNav – kafle grafu" \
+              --notes "Graf dróg pieszych w kaflach 0,5° (PL, CZ, SK) dla silnika tras MudNav. Dane © współtwórcy OpenStreetMap, ODbL; wysokości SRTM."
+          fi
+          # Najpierw kafle, na końcu katalog – aplikacja nie zobaczy wpisu bez pliku.
+          ls tiles/*.mnwt | xargs -n 50 gh release upload walk-tiles --clobber
+          gh release upload walk-tiles walk-tiles.json --clobber
