@@ -19,6 +19,7 @@ def main(maps_dir, out, merge=None, url_base=None):
                 print('brak', path)
                 continue
             dem = os.path.join(maps_dir, r['id'] + '.dem.zip')
+            walk = os.path.join(maps_dir, r['id'] + '.walk.gz')
             regions.append({
                 'id': r['id'], 'name': r['name'], 'kind': kind, 'file': r['id'] + '.map',
                 'sizeBytes': os.path.getsize(path), 'sha256': sha256(path),
@@ -30,6 +31,10 @@ def main(maps_dir, out, merge=None, url_base=None):
                 **({'demFile': r['id'] + '.dem.zip', 'demSizeBytes': os.path.getsize(dem), 'demSha256': sha256(dem),
                     **({'demUrl': url_base.rstrip('/') + '/' + r['id'] + '.dem.zip'} if url_base else {})}
                    if os.path.exists(dem) else {}),
+                # Graf dróg pieszych dla silnika tras MudNav (tools/walkgraph.py) – opcjonalny.
+                **({'walkFile': r['id'] + '.walk.gz', 'walkSizeBytes': os.path.getsize(walk), 'walkSha256': sha256(walk),
+                    **({'walkUrl': url_base.rstrip('/') + '/' + r['id'] + '.walk.gz'} if url_base else {})}
+                   if os.path.exists(walk) else {}),
             })
     # Częściowa publikacja (np. same pasma): mapy niezbudowane teraz zostają z poprzedniego katalogu.
     if merge and os.path.exists(merge):

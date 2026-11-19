@@ -118,6 +118,13 @@ jobs:
               s, w, n, e = r['bbox']
               sub = f"{r['id']}.osm.pbf"
               subprocess.run(['osmium', 'extract', '-b', f'{w},{s},{e},{n}', '--set-bounds', 'all.osm.pbf', '-o', sub, '--overwrite'], check=True)
+              # Graf dróg pieszych dla silnika tras MudNav (out/<id>.walk.gz) – aplikacja pobiera go razem z mapą pasma,
+              # więc trasy liczą się w telefonie bez internetu. Błąd grafu nie blokuje mapy.
+              try:
+                  subprocess.run(['python3', 'tools/walkgraph.py', sub, str(s), str(w), str(n), str(e), f"out/{r['id']}.walk.gz"],
+                                 check=True, timeout=1800)
+              except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
+                  print('::warning::graf tras pominięty dla', r['id'], err)
               # Poziomice z danych wysokościowych + odchudzone kafle wysokości do cieniowania w aplikacji (out/<id>.dem.zip).
               # Gdyby dane wysokości były niedostępne, mapa buduje się bez poziomic.
               try:
@@ -141,6 +148,7 @@ jobs:
           path: |
             out/*.map
             out/*.dem.zip
+            out/*.walk.gz
           retention-days: 3
 
   countries:

@@ -50,7 +50,7 @@ jobs:
             gh release create "$TAG" --latest=false --title "Mapy $(date -u +%Y-%m-%d) ($TAG)" \
               --notes "Jedna wersja map offline – pobieranie rozpoczęte z tej wersji dokończy się mimo nowszych map. Usuwana po 7 dniach, gdy nikt już jej nie używa. Dane © współtwórcy OpenStreetMap, ODbL."
           fi
-          gh release upload "$TAG" maps/*.map $(ls maps/*.dem.zip 2>/dev/null) --clobber
+          gh release upload "$TAG" maps/*.map $(ls maps/*.dem.zip maps/*.walk.gz 2>/dev/null) --clobber
       - name: Wydanie „latest”
         env:
           GH_TOKEN: ${{ github.token }}
@@ -60,7 +60,7 @@ jobs:
               --notes "Mapy Mapsforge z OpenStreetMap dla aplikacji MudNav. Dane © współtwórcy OpenStreetMap, licencja ODbL."
           fi
           # Pliki także w „latest” – dla starszych wersji aplikacji (bez adresów wersji w katalogu).
-          gh release upload latest maps/*.map $(ls maps/*.dem.zip 2>/dev/null) maps.json --clobber
+          gh release upload latest maps/*.map $(ls maps/*.dem.zip maps/*.walk.gz 2>/dev/null) maps.json --clobber
       - name: Sprzątanie starych wersji
         env:
           GH_TOKEN: ${{ github.token }}
