@@ -206,12 +206,18 @@ jobs:
           python3 tools/protected.py prot-src.osm.pbf prot.osm.pbf
           # Zwykłe domy: sam obrys (building=yes), potem dobranie ich punktów z danych źródłowych.
           osmium tags-filter in.osm.pbf w/building -o bsrc.osm.pbf
-          python3 tools/buildings.py bsrc.osm.pbf bways.osm.pbf
+          # Obrysy budynków uproszczone o 0,7 m (pomiar na Krakowie: niewidoczne, razem z obszarami −8% mapy).
+          MUDNAV_BUILDING_SIMPLIFY_M=0.7 python3 tools/buildings.py bsrc.osm.pbf bways.osm.pbf
           osmium getid -r -I bways.osm.pbf bsrc.osm.pbf -o bfull.osm.pbf
           osmium cat bfull.osm.pbf -t node -o bnodes.osm.pbf
           rm in.osm.pbf bsrc.osm.pbf bfull.osm.pbf
           osmium merge slim.osm.pbf trails.osm.pbf extra.osm.pbf prot.osm.pbf bnodes.osm.pbf bways.osm.pbf water.osm.pbf -o merged.osm.pbf --overwrite
           mv merged.osm.pbf slim.osm.pbf
+          # Granice obszarów (lasy, pola, zabudowa) uproszczone o 2,5 m – tools/areas.py.
+          python3 tools/areas.py slim.osm.pbf aways.osm.pbf aids.txt
+          osmium removeid -i aids.txt slim.osm.pbf -o slim-rm.osm.pbf --overwrite
+          osmium merge slim-rm.osm.pbf aways.osm.pbf -o slim.osm.pbf --overwrite
+          rm slim-rm.osm.pbf aways.osm.pbf aids.txt
           rm hiking.osm.pbf trails.osm.pbf extra-src.osm.pbf extra.osm.pbf prot-src.osm.pbf prot.osm.pbf bnodes.osm.pbf bways.osm.pbf water-src.osm.pbf water.osm.pbf
           # Część kraju: wycinek prostokąta (bbox w regions.json: minLat,minLon,maxLat,maxLon; osmium chce lon,lat).
           IFS=, read -r s w n e <<< "${{ matrix.bbox }}"
