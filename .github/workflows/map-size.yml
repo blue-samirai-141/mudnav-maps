@@ -85,6 +85,18 @@ jobs:
           # Ustawienia zapisu: mniej warstw przybliżenia (mniej powtórzeń tych samych obiektów) i inne granice warstw.
           write i-warstwy-2 v-a.osm.pbf zoom-interval-conf=7,0,11,14,12,21
           write j-warstwy-4 v-a.osm.pbf zoom-interval-conf=5,0,7,10,8,11,13,12,14,16,15,21
+          # Uproszczone granice obszarów (tools/areas.py): 2,5 m i 5 m; do tego uproszczone obrysy budynków.
+          areas() {  # $1 = plik, $2 = tolerancja, $3 = wynik
+            MUDNAV_AREA_SIMPLIFY_M=$2 python3 tools/areas.py "$1" aw.osm.pbf aids.txt
+            osmium removeid -i aids.txt "$1" -o rm.osm.pbf --overwrite
+            osmium merge rm.osm.pbf aw.osm.pbf -o "$3" --overwrite
+          }
+          areas v-a.osm.pbf 2.5 v-k.osm.pbf
+          areas v-a.osm.pbf 5 v-k5.osm.pbf
+          areas v-c.osm.pbf 2.5 v-l.osm.pbf
+          write k-obszary-2.5m v-k.osm.pbf
+          write k5-obszary-5m v-k5.osm.pbf
+          write l-obszary-2.5m-budynki-0.7m v-l.osm.pbf
           {
             echo "## Rozmiar mapy Krakowa ($BBOX)"
             echo "| Wariant | MB |"; echo "|---|---|"
