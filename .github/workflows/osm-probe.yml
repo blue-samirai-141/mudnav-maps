@@ -1,0 +1,27 @@
+name: Podgląd danych OSM (diagnostyka)
+
+# Ręcznie: wszystkie znaczniki dróg i cieków w małym prostokącie – sprawdzenie, czy mostek/przepust jest w danych.
+on:
+  workflow_dispatch:
+    inputs:
+      bbox:
+        description: "minLon,minLat,maxLon,maxLat"
+        default: "19.9325,49.9895,19.9365,49.9910"
+      region:
+        description: "Plik Geofabrik (np. poland/malopolskie)"
+        default: "poland/malopolskie"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dane i znaczniki
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+          curl -sSfL --retry 3 -o r.osm.pbf "https://download.geofabrik.de/europe/${{ inputs.region }}-latest.osm.pbf"
+          osmium extract -b "${{ inputs.bbox }}" -s complete_ways r.osm.pbf -o small.osm.pbf
+          osmium tags-filter small.osm.pbf w/highway w/waterway w/bridge w/man_made=bridge -o f.osm.pbf
+          osmium cat f.osm.pbf -t way -f opl | sed 's/ N.*//' | tee -a "$GITHUB_STEP_SUMMARY"
