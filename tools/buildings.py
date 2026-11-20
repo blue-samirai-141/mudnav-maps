@@ -9,11 +9,18 @@ Wynik to same linie (bez punktów); punkty dobiera potem `osmium getid` (patrz m
 Użycie: python3 buildings.py budynki-zrodlo.osm.pbf budynki-linie.osm.pbf
 """
 import math
+import os
 import sys
 
 import osmium
 
-MIN_AREA_M2 = 30.0
+sys.path.insert(0, os.path.dirname(__file__))
+from trails import simplify  # noqa: E402  – Douglas–Peucker na (id, lat, lon)
+
+# Uproszczenie obrysu [m] (0 – bez zmian). Zwykły dom ma w OSM często 10–30 punktów, a na mapie wygląda jak prostokąt.
+SIMPLIFY_M = float(os.environ.get('MUDNAV_BUILDING_SIMPLIFY_M', '0'))
+
+MIN_AREA_M2 = float(os.environ.get('MUDNAV_BUILDING_MIN_AREA_M2', '30'))
 SMALL = {'garage', 'garages', 'shed', 'hut', 'roof', 'carport', 'greenhouse', 'kiosk', 'toilets', 'container',
          'service', 'transformer_tower', 'outbuilding', 'gazebo', 'ruins', 'construction', 'no'}
 # Klucze, po których dane kraju i tak zostawiają obiekt (filtr „Odchudzenie danych” w maps.yml).
@@ -48,7 +55,13 @@ def main(src, out):
             if b in SMALL or len(o.nodes) < 4 or o.nodes[0].ref != o.nodes[-1].ref or area_m2(o.nodes) < MIN_AREA_M2:
                 small += 1
                 continue
-            w.add_way(o.replace(tags={'building': 'yes'}))
+            refs = [n.ref for n in o.nodes]
+            if SIMPLIFY_M > 0:
+                pts = [(n.ref, n.location.lat, n.location.lon) for n in o.nodes]
+                keep = simplify(pts[:-1], SIMPLIFY_M)  # bez punktu zamykającego (ten sam co pierwszy)
+                if len(keep) >= 3:
+                    refs = keep + [keep[0]]
+            w.add_way(o.replace(tags={'building': 'yes'}, nodes=refs))
             kept += 1
     print(f'budynki: {kept} obrysów, pominięto {small} drobnych i {other} z nazwą/funkcją (są już w danych)')
 

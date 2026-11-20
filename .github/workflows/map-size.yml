@@ -1,0 +1,88 @@
+name: Pomiar rozmiaru map (próba)
+
+# Ręcznie: ta sama mapa (okolice Krakowa) w kilku wariantach – ile zajmują budynki, ile daje uproszczenie
+# obrysów, pominięcie drobnicy i ustawienia zapisu. Wynik w podsumowaniu przebiegu i w artefakcie (mapy do podglądu).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  WRITER: https://repo1.maven.org/maven2/org/mapsforge/mapsforge-map-writer/0.21.0/mapsforge-map-writer-0.21.0-jar-with-dependencies.jar
+  # Kraków z okolicą: minLat,minLon,maxLat,maxLon
+  BBOX: "49.95,19.75,50.15,20.15"
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Narzędzia
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool osmosis
+          mkdir -p ~/.openstreetmap/osmosis/plugins
+          curl -sSfL --retry 3 -o ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar "$WRITER"
+          pip install -q --break-system-packages "osmium>=4" numpy contourpy shapely
+          python3 tools/tag_mapping.py ~/.openstreetmap/osmosis/plugins/mapsforge-map-writer.jar tag-mapping.xml
+      - name: Dane (Małopolska, wycinek Krakowa)
+        run: |
+          for i in 1 2 3 4; do
+            curl -sSfL --retry 2 --connect-timeout 30 --max-time 1800 -o mp.osm.pbf \
+              https://download.geofabrik.de/europe/poland/malopolskie-latest.osm.pbf && break
+            [ $i = 4 ] && exit 1; sleep 30
+          done
+          IFS=, read -r s w n e <<< "$BBOX"
+          osmium extract -b "$w,$s,$e,$n" -s complete_ways mp.osm.pbf -o in.osm.pbf
+          ls -la in.osm.pbf
+      - name: Warianty
+        env:
+          JAVACMD_OPTIONS: -Xmx10g
+        run: |
+          set -e
+          IFS=, read -r s w n e <<< "$BBOX"
+          mkdir -p out
+          # Wspólne warstwy jak w mapach krajów (maps.yml, zadanie „countries”).
+          osmium tags-filter in.osm.pbf \
+            nwr/highway nwr/railway nwr/aeroway nwr/aerialway nwr/waterway nwr/natural nwr/landuse nwr/leisure \
+            nwr/amenity nwr/tourism nwr/historic nwr/man_made nwr/place nwr/sport nwr/shop nwr/military nwr/water \
+            nwr/wetland nwr/mountain_pass nwr/piste:type nwr/power=line,minor_line,tower nwr/name \
+            r/route r/boundary=administrative,national_park,protected_area r/type=multipolygon -o slim.osm.pbf
+          osmium tags-filter in.osm.pbf r/route=hiking,foot -o hiking.osm.pbf
+          python3 tools/trails.py hiking.osm.pbf trails.osm.pbf
+          osmium tags-filter in.osm.pbf w/building -o bsrc.osm.pbf
+          buildings() {  # $1 = nazwa; zmienne MUDNAV_BUILDING_* ustawione przed wywołaniem
+            python3 tools/buildings.py bsrc.osm.pbf "b-$1-ways.osm.pbf"
+            osmium getid -r -I "b-$1-ways.osm.pbf" bsrc.osm.pbf -o "b-$1-full.osm.pbf" --overwrite
+            osmium cat "b-$1-full.osm.pbf" -t node -o "b-$1-nodes.osm.pbf" --overwrite
+          }
+          write() {  # $1 = nazwa, $2 = plik wejściowy, dalej opcje writera
+            local name=$1 src=$2; shift 2
+            osmosis -q --rbf file="$src" --mapfile-writer file="out/$name.map" type=ram threads=4 bbox="$s,$w,$n,$e" \
+              tag-conf-file=tag-mapping.xml label-position=true skip-invalid-relations=true "$@"
+          }
+          MUDNAV_BUILDING_SIMPLIFY_M=0 MUDNAV_BUILDING_MIN_AREA_M2=30 buildings base
+          MUDNAV_BUILDING_SIMPLIFY_M=0.7 MUDNAV_BUILDING_MIN_AREA_M2=30 buildings simple
+          MUDNAV_BUILDING_SIMPLIFY_M=0.7 MUDNAV_BUILDING_MIN_AREA_M2=50 buildings simple50
+          osmium merge slim.osm.pbf trails.osm.pbf b-base-nodes.osm.pbf b-base-ways.osm.pbf -o v-a.osm.pbf
+          osmium merge slim.osm.pbf trails.osm.pbf -o v-b.osm.pbf
+          osmium merge slim.osm.pbf trails.osm.pbf b-simple-nodes.osm.pbf b-simple-ways.osm.pbf -o v-c.osm.pbf
+          osmium merge slim.osm.pbf trails.osm.pbf b-simple50-nodes.osm.pbf b-simple50-ways.osm.pbf -o v-d.osm.pbf
+          osmium merge in.osm.pbf trails.osm.pbf -o v-full.osm.pbf
+          write a-obecna v-a.osm.pbf
+          write b-bez-budynkow v-b.osm.pbf
+          write c-budynki-uproszczone v-c.osm.pbf
+          write d-uproszczone-bez-malych v-d.osm.pbf
+          write e-obecna-simplification5 v-a.osm.pbf simplification-factor=5
+          write f-pelne-dane v-full.osm.pbf
+          {
+            echo "## Rozmiar mapy Krakowa ($BBOX)"
+            echo "| Wariant | MB |"; echo "|---|---|"
+            for f in out/*.map; do echo "| $(basename "$f" .map) | $(python3 -c "import os;print(round(os.path.getsize('$f')/1e6,2))") |"; done
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: krakow-maps
+          path: out/*.map
+          retention-days: 7
