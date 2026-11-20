@@ -76,6 +76,15 @@ jobs:
           write d-uproszczone-bez-malych v-d.osm.pbf
           write e-obecna-simplification5 v-a.osm.pbf simplification-factor=5
           write f-pelne-dane v-full.osm.pbf
+          # Rozbicie reszty mapy: bez obszarów (lasy, łąki, zabudowa), bez drobnych dróg, bez podpisów dróg.
+          osmium tags-filter --invert-match v-a.osm.pbf w/landuse w/natural=wood,scrub,grassland,heath,meadow w/leisure=park,garden,pitch \
+            r/landuse r/natural=wood,scrub,grassland -o v-g.osm.pbf
+          osmium tags-filter --invert-match v-a.osm.pbf w/highway=footway,service,path,track,steps,cycleway,pedestrian -o v-h.osm.pbf
+          write g-bez-obszarow v-g.osm.pbf
+          write h-bez-drobnych-drog v-h.osm.pbf
+          # Ustawienia zapisu: mniej warstw przybliżenia (mniej powtórzeń tych samych obiektów) i inne granice warstw.
+          write i-warstwy-2 v-a.osm.pbf zoom-interval-conf=7,0,11,14,12,21
+          write j-warstwy-4 v-a.osm.pbf zoom-interval-conf=5,0,7,10,8,11,13,12,14,16,15,21
           {
             echo "## Rozmiar mapy Krakowa ($BBOX)"
             echo "| Wariant | MB |"; echo "|---|---|"
