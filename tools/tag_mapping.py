@@ -50,6 +50,14 @@ HUTS = ''.join(
 
 xml = zipfile.ZipFile(sys.argv[1]).read('tag-mapping.xml').decode('utf-8')
 at = xml.rindex('</tag-mapping>')
-xml = xml[:at] + '    <!-- MudNav: skały -->\n    <pois>\n' + ROCK_POIS + '    </pois>\n' + '    <!-- MudNav: szlaki turystyczne, poziomice, schroniska-budynki, skały -->\n    <ways>\n' + TRAILS + CONTOURS + ROCK_WAYS + PROTECT + (HUTS if 'key="tourism" value="alpine_hut"' not in xml[xml.find('<ways>'):] else '') + '    </ways>\n' + xml[at:]
+# Przepusty (ciek pod ścieżką, tunnel=culvert) – na mapie rysowane jak mostek; w OSM to częsty sposób oznaczenia
+# kładki nad potokiem (np. park w Swoszowicach). Do tego mosty-kładki i wiadukty. Tylko te, których brak w zestawie
+# domyślnym (powtórzony wpis psułby mapowanie).
+CROSSINGS = ''.join(
+    f'        <osm-tag key="{k}" value="{v}" zoom-appear="15"/>\n'
+    for k, v in (('tunnel', 'culvert'), ('bridge', 'boardwalk'), ('bridge', 'viaduct'))
+    if f'key="{k}" value="{v}"' not in xml[xml.find('<ways>'):]
+)
+xml = xml[:at] + '    <!-- MudNav: skały -->\n    <pois>\n' + ROCK_POIS + '    </pois>\n' + '    <!-- MudNav: szlaki turystyczne, poziomice, schroniska-budynki, skały -->\n    <ways>\n' + TRAILS + CONTOURS + ROCK_WAYS + PROTECT + CROSSINGS + (HUTS if 'key="tourism" value="alpine_hut"' not in xml[xml.find('<ways>'):] else '') + '    </ways>\n' + xml[at:]
 open(sys.argv[2], 'w', encoding='utf-8').write(xml)
 print('tag-mapping ze szlakami i poziomicami:', sys.argv[2])
