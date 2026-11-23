@@ -12,6 +12,8 @@
     {"name": "Zakopane dworzec → Kuźnice (miasto)", "points": [[49.3001, 19.9590], [49.2705, 19.9810]]},
     {"name": "Krupówki → Gubałówka dolna stacja (miasto)", "points": [[49.2967, 19.9504], [49.3000, 19.9440]]},
     {"name": "Krupówki → Kalatówki", "points": [[49.2967, 19.9504], [49.2594, 19.9666]]},
-    {"name": "Kuźnice → Murowaniec", "points": [[49.2705, 19.9810], [49.2434, 20.0072]]}
+    {"name": "Kuźnice → Murowaniec", "points": [[49.2705, 19.9810], [49.2434, 20.0072]]},
+    {"name": "Zawrat → Kozi Wierch (Orla Perć, z prądem)", "points": [[49.21909, 20.01639], [49.21832, 20.02871]]},
+    {"name": "Kozi Wierch → Zawrat (Orla Perć pod prąd – trasa nie może iść granią)", "points": [[49.21832, 20.02871], [49.21909, 20.01639]]}
   ]
 }

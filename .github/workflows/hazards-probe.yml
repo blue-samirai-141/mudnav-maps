@@ -1,0 +1,27 @@
+name: Ubezpieczenia na szlakach (diagnostyka)
+
+# Ręcznie: jakie znaczniki OSM opisują łańcuchy, klamry, drabinki i ekspozycję na trudnych szlakach (tools/hazards_probe.py).
+on:
+  workflow_dispatch:
+    inputs:
+      bbox:
+        description: "S W N E (spacjami)"
+        default: "49.15 19.75 49.33 20.25"
+      region:
+        description: "Plik Geofabrik (np. poland/malopolskie, slovakia)"
+        default: "poland/malopolskie"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dane i analiza
+        run: |
+          pip install -q osmium
+          curl -sSfL --retry 3 -o r.osm.pbf "https://download.geofabrik.de/europe/${{ inputs.region }}-latest.osm.pbf"
+          python3 tools/hazards_probe.py r.osm.pbf ${{ inputs.bbox }} wynik.md
+          cat wynik.md >> "$GITHUB_STEP_SUMMARY"
