@@ -12,7 +12,9 @@ Format (little-endian, cały plik w gzip):
             bity 0–3 klasa (0 ścieżka/chodnik, 1 schody, 2 droga gruntowa, 3 ulica osiedlowa/serwisowa,
                             4 droga lokalna, 5 droga wojewódzka, 6 droga krajowa, 7 via ferrata)
             bity 4–6 SAC (0 brak, 1–6), bity 7–11 kolory szlaków (czerwony, niebieski, zielony, żółty, czarny),
-            bit 12 chodnik przy drodze
+            bit 12 chodnik przy drodze,
+            bit 13 tylko w kierunku a→b, bit 14 tylko w kierunku b→a (szlak jednokierunkowy, np. Orla Perć
+            Zawrat → Kozi Wierch); bez bitów 13–14 – w obie strony. Starsze aplikacje bity ignorują (zgodne wstecz).
 
 Użycie: python3 walkgraph.py wejście.osm.pbf S W N E wynik.walk.gz
 """
@@ -43,6 +45,28 @@ CLASS = {
     'via_ferrata': 7,
 }
 FOOT_OK = {'yes', 'designated', 'permissive', 'official'}
+ONEWAY_FWD = 1 << 13
+ONEWAY_BWD = 1 << 14
+# „oneway” bez dopisku dotyczy pieszych tylko na drogach pieszych (na ulicy czy drodze rowerowej – pojazdów).
+FOOT_WAYS = {'path', 'footway', 'steps', 'via_ferrata', 'pedestrian', 'corridor'}
+
+
+def oneway(t):
+    """Kierunek dla pieszego: ONEWAY_FWD (zgodnie z kolejnością węzłów drogi), ONEWAY_BWD (pod prąd) albo 0."""
+    v = t.get('oneway:foot')
+    if v is None:
+        hw = t.get('highway')
+        if hw not in FOOT_WAYS:
+            return 0
+        # Ścieżka rowerowa oznaczona jako „path”: jednokierunkowość dla rowerów, nie dla pieszych.
+        if hw == 'path' and t.get('bicycle') == 'designated' and t.get('foot') not in ('designated',):
+            return 0
+        v = t.get('oneway')
+    if v in ('yes', 'true', '1'):
+        return ONEWAY_FWD
+    if v in ('-1', 'reverse'):
+        return ONEWAY_BWD
+    return 0
 
 
 def walkable(t):
@@ -117,7 +141,7 @@ class Ways(osmium.SimpleHandler):
             return
         sac = SAC.get(t.get('sac_scale', ''), 5 if cls == 7 else 0)
         sidewalk = 1 if t.get('sidewalk', 'no') not in ('no', 'none', 'separate') or t.get('footway') == 'sidewalk' else 0
-        flags = cls | (sac << 4) | (self.colors.get(w.id, 0) << 7) | (sidewalk << 12)
+        flags = cls | (sac << 4) | (self.colors.get(w.id, 0) << 7) | (sidewalk << 12) | oneway(t)
         prev = None
         for n in w.nodes:
             if not n.location.valid():
@@ -176,7 +200,8 @@ def main(src, s, w, n, e, out):
         f.write(buf)
     marked = sum(1 for *_, fl in ways.edges if fl >> 7 & 31)
     sac = sum(1 for *_, fl in ways.edges if fl >> 4 & 7)
-    print(f'{out}: węzłów {len(ways.nodes)}, odcinków {len(ways.edges)} (szlaki {marked}, SAC {sac}), '
+    one = sum(1 for *_, fl in ways.edges if fl & (ONEWAY_FWD | ONEWAY_BWD))
+    print(f'{out}: węzłów {len(ways.nodes)}, odcinków {len(ways.edges)} (szlaki {marked}, SAC {sac}, jednokierunkowe {one}), '
           f'{os.path.getsize(out) / 1e6:.1f} MB')
 
 

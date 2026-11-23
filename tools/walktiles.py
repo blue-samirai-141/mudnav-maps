@@ -13,7 +13,8 @@ Format pliku <nazwa>.mnwt (cały w gzip), liczby jako varint (bez znaku), warto�
   varint liczbaWęzłów, liczbaOdcinków, liczbaBrzegowych
   węzły:     zz Δlat, zz Δlon [mikrostopnie, względem poprzedniego węzła; pierwszy względem rogu kafla],
              varint wysokość+1000 (0 = brak)
-  odcinki:   varint a, zz (b − a), varint flagi (jak w walkgraph.py), varint liczbaPunktówPośrednich,
+  odcinki:   varint a, zz (b − a), varint flagi (jak w walkgraph.py; bity kierunku 13–14 względem a → b odcinka
+             w kaflu, nie drogi OSM), varint liczbaPunktówPośrednich,
              punkty: zz Δlat, zz Δlon (względem poprzedniego punktu, zaczynając od węzła a), zz Δwysokości
              (pierwszy względem wysokości węzła a; brak wysokości = 0)
   brzegowe:  varint węzeł, varint liczbaKafli, dla każdego zz ΔlatIdx, zz ΔlonIdx
@@ -31,6 +32,17 @@ from collections import defaultdict
 
 TILE = 0.5
 NO_ELE = None
+ONEWAY_FWD = 1 << 13
+ONEWAY_BWD = 1 << 14
+ONEWAY = ONEWAY_FWD | ONEWAY_BWD
+
+
+def oriented(edges, e, frm):
+    """Flagi odcinka OSM [e] przy przejściu od węzła [frm]: kierunek (bity 13–14) odwrócony, gdy idziemy b → a."""
+    a, _, fl = edges[e]
+    if a == frm or not fl & ONEWAY:
+        return fl
+    return fl & ~ONEWAY | (ONEWAY_BWD if fl & ONEWAY_FWD else ONEWAY_FWD)
 
 
 def tile_of(lat, lon):
@@ -94,7 +106,10 @@ def encode_tile(t, eids, lat, lon, ele, edges, appears):
         nb = adj[n]
         if len(nb) != 2 or len(appears[n]) > 1:
             return True
-        return edges[nb[0][0]][2] != edges[nb[1][0]][2]
+        # Ciągłość także kierunku: idąc n1 → n → n2 oba odcinki muszą mieć te same flagi w tym kierunku
+        # (drogi OSM w jednym łańcuchu mogą mieć przeciwną kolejność węzłów).
+        (e1, n1), (e2, _) = nb
+        return oriented(edges, e1, n1) != oriented(edges, e2, n)
 
     junctions = {n for n in adj if junction(n)}
     used = set()
@@ -119,7 +134,7 @@ def encode_tile(t, eids, lat, lon, ele, edges, appears):
             if e in used:
                 continue
             end, mids = walk(j, e, n)
-            chains.append((j, end, edges[e][2], mids))
+            chains.append((j, end, oriented(edges, e, j), mids))
     # Pętle bez skrzyżowania (np. droga dookoła stawu bez odgałęzień) – jeden węzeł staje się skrzyżowaniem.
     for n in sorted(adj):
         for e, nb in adj[n]:
@@ -127,7 +142,7 @@ def encode_tile(t, eids, lat, lon, ele, edges, appears):
                 continue
             junctions.add(n)
             end, mids = walk(n, e, nb)
-            chains.append((n, end, edges[e][2], mids))
+            chains.append((n, end, oriented(edges, e, n), mids))
 
     # Węzły posortowane przestrzennie (komórki ~1 km, wężykiem) – małe różnice współrzędnych.
     def key(n):
