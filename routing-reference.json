@@ -406,6 +406,42 @@
      19.8932
     ]
    ]
+  },
+  {
+   "name": "Zawrat → Mały Kozi → Kozi Wierch (grań Orlej Perci, z prądem)",
+   "range": "Tatry",
+   "points": [
+    [
+     49.21909,
+     20.01639
+    ],
+    [
+     49.2189,
+     20.02
+    ],
+    [
+     49.21832,
+     20.02871
+    ]
+   ]
+  },
+  {
+   "name": "Kozi Wierch → Mały Kozi → Zawrat (grań pod prąd – nie wolno granią)",
+   "range": "Tatry",
+   "points": [
+    [
+     49.21832,
+     20.02871
+    ],
+    [
+     49.2189,
+     20.02
+    ],
+    [
+     49.21909,
+     20.01639
+    ]
+   ]
   }
  ]
 }
