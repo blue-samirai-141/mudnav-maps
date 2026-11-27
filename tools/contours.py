@@ -47,9 +47,13 @@ def tile(lat, lon, cache='dem-cache'):
 
 
 def smooth(a):
-    k = np.array([1, 2, 1], dtype=np.float32) / 4
-    a = np.apply_along_axis(lambda m: np.convolve(m, k, mode='same'), 0, a)
-    return np.apply_along_axis(lambda m: np.convolve(m, k, mode='same'), 1, a)
+    """Filtr 1-2-1 w obu kierunkach. Brzegi powielane (pad „edge”): dawniej np.convolve(mode='same') dopełniał zerami
+    i brzegowa kolumna/wiersz każdego kafla HGT wychodziły o ~25% za nisko – w aplikacji jasny pas w cieniowaniu rzeźby
+    i fałszywe strome zbocze w warstwie lawinowej na styku kafli (film 27.11, południk 20°)."""
+    p = np.pad(a, 1, mode='edge')
+    a = (p[:-2, 1:-1] + 2 * p[1:-1, 1:-1] + p[2:, 1:-1]) / 4
+    p = np.pad(a, 1, mode='edge')
+    return ((p[1:-1, :-2] + 2 * p[1:-1, 1:-1] + p[1:-1, 2:]) / 4).astype(np.float32)
 
 
 def klass(ele):
