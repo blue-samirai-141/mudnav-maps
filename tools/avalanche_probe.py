@@ -18,7 +18,21 @@ PAGES = [
 GUESSES = [
     "https://lawiny.topr.pl/api/bulletin", "https://lawiny.topr.pl/api/bulletins", "https://lawiny.topr.pl/api/v1/bulletin",
     "https://lawiny.topr.pl/caaml", "https://lawiny.topr.pl/bulletin.json", "https://lawiny.topr.pl/feed", "https://lawiny.topr.pl/rss",
+    "https://lawiny.topr.pl/wp-json/testapi/v1", "https://lawiny.topr.pl/getwidget",
 ]
+
+def caaml_guesses():
+    """Katalog uploads/caaml (stąd PDF komunikatu) – możliwe nazwy pliku danych na dziś i wczoraj."""
+    import datetime as dt
+    base = "https://lawiny.topr.pl/wp-content/uploads/caaml/"
+    out = [base]
+    for d in (dt.date.today(), dt.date.today() - dt.timedelta(days=1)):
+        s = d.isoformat()
+        for name in (f"{s}.json", f"{s}.xml", f"caaml_{s}.json", f"caaml_{s}.xml", f"caaml_pl_{s}.json", f"caaml_pl_{s}.xml",
+                     f"json_pl_{s}.json", f"xml_pl_{s}.xml", f"pl_{s}.json", f"pl_{s}.xml", f"bulletin_{s}.json", f"bulletin_pl_{s}.json",
+                     f"caamlv6_{s}.json", f"CAAMLv6_{s}.json", f"{s}_pl.json", f"{s}_pl.xml", f"caaml_en_{s}.json", f"json_en_{s}.json"):
+            out.append(base + name)
+    return out
 
 def get(url, limit=3_000_000):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
@@ -61,7 +75,7 @@ def main(out):
                 u = urllib.parse.urljoin(base, m.group(1))
                 if u.startswith("http") and not u.endswith((".png", ".jpg", ".svg", ".css", ".woff", ".woff2")):
                     queue.append(u)
-    for g in GUESSES:
+    for g in GUESSES + caaml_guesses():
         status, ctype, body = get(g)
         md.append(f"- zgadywane `{status}` {ctype[:40]} – {g} ({len(body)} B)")
         if body:
