@@ -6,8 +6,9 @@ name: Warunki (komunikat lawinowy dla aplikacji)
 # Automatycznie co godzinę w sezonie: TOPR, HZS (laviny.sk) i GOPR – źródła w tools/conditions.py.
 on:
   schedule:
-    # W sezonie (listopad–maj) co godzinę.
-    - cron: "23 * * 11,12,1,2,3,4,5 *"
+    # Co godzinę; poza sezonem (czerwiec–październik) przebieg kończy się od razu (krok „Sezon”).
+    # Lista miesięcy w polu cron („11,12,1,…”) nie uruchamiała akcji wcale (retest 5, O33).
+    - cron: "23 * * * *"
   workflow_dispatch:
     inputs:
       manual:
@@ -25,8 +26,15 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Sezon
+        id: season
+        run: |
+          m=$(date -u +%-m)
+          if [ "${{ github.event_name }}" = schedule ] && [ "$m" -ge 6 ] && [ "$m" -le 10 ]; then echo on=0 >> "$GITHUB_OUTPUT"; else echo on=1 >> "$GITHUB_OUTPUT"; fi
       - uses: actions/checkout@v4
+        if: steps.season.outputs.on == '1'
       - name: conditions.json
+        if: steps.season.outputs.on == '1'
         env:
           MANUAL: ${{ inputs.manual }}
           REGION: ${{ inputs.region }}
@@ -36,6 +44,7 @@ jobs:
           python3 tools/conditions.py "${args[@]}" conditions.json
           echo '```json' >> "$GITHUB_STEP_SUMMARY"; cat conditions.json >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
       - name: Wydanie „conditions”
+        if: steps.season.outputs.on == '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
