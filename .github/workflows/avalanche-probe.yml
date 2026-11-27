@@ -1,0 +1,23 @@
+name: Komunikat lawinowy (diagnostyka)
+
+# Ręcznie: w jakim formacie TOPR (i TPN, HZS) publikuje komunikaty – tools/avalanche_probe.py.
+# Wynik: podsumowanie w akcji i surowe strony w artefakcie „probe”.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pobranie i analiza
+        run: |
+          python3 tools/avalanche_probe.py probe
+          cat probe/wynik.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe
+          path: probe/

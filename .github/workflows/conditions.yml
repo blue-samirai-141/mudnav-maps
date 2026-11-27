@@ -1,0 +1,38 @@
+name: Warunki (komunikat lawinowy dla aplikacji)
+
+# Plik conditions.json w wydaniu „conditions” – aplikacja pobiera go przy każdym uruchomieniu (1–2 KB).
+# Ręcznie: pole „manual” (komunikat przepisany z lawiny.topr.pl, format w tools/conditions.py) albo „caaml” (adres EAWS CAAML).
+# Automatyczny odczyt TOPR – po diagnostyce formatu (avalanche-probe.yml); wtedy dojdzie harmonogram co 30 min w sezonie.
+on:
+  workflow_dispatch:
+    inputs:
+      manual:
+        description: "Komunikat (JSON, patrz tools/conditions.py)"
+        required: false
+      caaml:
+        description: "Adres komunikatu EAWS CAAML v6 (JSON)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: conditions.json
+        env:
+          MANUAL: ${{ inputs.manual }}
+          CAAML: ${{ inputs.caaml }}
+        run: |
+          args=()
+          if [ -n "$MANUAL" ]; then args+=(--manual "$MANUAL"); elif [ -n "$CAAML" ]; then args+=(--caaml "$CAAML"); fi
+          python3 tools/conditions.py "${args[@]}" conditions.json
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"; cat conditions.json >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Wydanie „conditions”
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view conditions >/dev/null 2>&1 || gh release create conditions --title "Warunki (komunikaty)" --notes "conditions.json dla aplikacji MudNav – nadpisywany przy każdym komunikacie."
+          gh release upload conditions conditions.json --clobber
