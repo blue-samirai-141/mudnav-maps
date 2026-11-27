@@ -6,8 +6,8 @@ name: Kafle tras (silnik MudNav)
 on:
   workflow_dispatch:
   schedule:
-    # Co miesiąc, dzień po mapach.
-    - cron: "17 3 2 * *"
+    # Co tydzień (wtorek) – świeże szlaki i zamknięcia dla silnika MudNav (plan: docs/SILNIK.md w MudNavProd).
+    - cron: "17 3 * * 2"
 
 permissions:
   contents: write
