@@ -31,6 +31,20 @@ UA = "MudNav-maps/1.0 (warunki dla aplikacji MudNav)"
 def http(url):
     return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=60).read()
 
+TOPR_BASE = "https://lawiny.topr.pl/wp-content/uploads/caaml/"
+
+def topr():
+    """Komunikat TOPR: plik JSON (struktura CAAML) z katalogu, z którego strona robi PDF – dziś albo wczoraj."""
+    for d in (dt.date.today(), dt.date.today() - dt.timedelta(days=1)):
+        try:
+            doc = json.loads(http(f"{TOPR_BASE}caaml_pl_{d.isoformat()}.json"))
+        except Exception as ex:  # noqa: BLE001
+            print("TOPR", d, ex, file=sys.stderr); continue
+        b = from_caaml(doc, REGIONS["tatry-pl"])
+        if b["levels"]:
+            return b
+    return None
+
 def slovakia():
     """Komunikat HZS w standardzie CAAML v6 – najwyższy z regionów tatrzańskich (dziś albo wczoraj)."""
     import re
@@ -75,13 +89,34 @@ def from_manual(m, region):
                       "maxM": elev(p.get("maxM"), t), "aspects": norm_aspects(p.get("aspects"))} for p in m.get("problems", [])],
     }
 
+def iso(t):
+    """Czas z komunikatu → ISO 8601 z przesunięciem. TOPR pisze np. „2026-11-27T20:00:00000” (bez strefy, czas polski)."""
+    if not t: return None
+    t = str(t).strip().replace(" ", "T")
+    try:
+        return dt.datetime.fromisoformat(t.replace("Z", "+00:00")).isoformat()
+    except ValueError:
+        pass
+    try:
+        from zoneinfo import ZoneInfo
+        return dt.datetime.fromisoformat(t[:19]).replace(tzinfo=ZoneInfo("Europe/Warsaw")).isoformat()
+    except ValueError:
+        return None
+
 def from_caaml(doc, region):
-    """EAWS CAAML v6 JSON: bulletins[].dangerRatings / avalancheProblems (bez części „pm” – pierwszy okres)."""
-    b = (doc.get("bulletins") or [doc])[0]
+    """EAWS CAAML v6 JSON: bulletins[].dangerRatings / avalancheProblems (bez części „pm” – pierwszy okres).
+    Przyjmuje {"bulletins": [...]}, samą listę (TOPR) albo jeden komunikat."""
+    items = doc.get("bulletins") if isinstance(doc, dict) else doc
+    if isinstance(doc, dict) and not items: items = [doc]
+    b = items[0]
     t = region["treelineM"]
     def bound(e, key):
         v = (e or {}).get(key)
-        return elev(v, t) if v is not None else None
+        if v is None or v == "": return None
+        try:
+            return elev(v, t)
+        except ValueError:
+            return t if "tree" in str(v).lower() else None
     levels = []
     names = {"low": 1, "moderate": 2, "considerable": 3, "high": 4, "very_high": 5}
     for r in b.get("dangerRatings", []):
@@ -91,7 +126,7 @@ def from_caaml(doc, region):
                  "minM": bound(p.get("elevation"), "lowerBound"), "maxM": bound(p.get("elevation"), "upperBound"),
                  "aspects": norm_aspects(p.get("aspects"))} for p in b.get("avalancheProblems", [])]
     vt = b.get("validTime", {})
-    return {"publishedAt": b.get("publicationTime"), "validFrom": vt.get("startTime"), "validUntil": vt.get("endTime"),
+    return {"publishedAt": iso(b.get("publicationTime")), "validFrom": iso(vt.get("startTime")), "validUntil": iso(vt.get("endTime")),
             "tendency": ((b.get("tendency") or [{}])[0]).get("tendencyType"), "levels": levels, "problems": problems}
 
 def main():
@@ -99,6 +134,7 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--caaml"); ap.add_argument("--manual"); ap.add_argument("--region", default="tatry-pl")
     ap.add_argument("--slovakia", action="store_true", help="dołącz komunikat HZS (laviny.sk) dla słowackich Tatr")
+    ap.add_argument("--topr", action="store_true", help="komunikat TOPR z lawiny.topr.pl (gdy nie ma --manual/--caaml)")
     ap.add_argument("--keep", help="poprzedni conditions.json (adres albo plik): zostają jego wciąż ważne komunikaty innych regionów")
     a = ap.parse_args()
     region = REGIONS[a.region]
@@ -108,6 +144,12 @@ def main():
     elif a.caaml:
         raw = http(a.caaml) if a.caaml.startswith("http") else open(a.caaml, "rb").read()
         found[a.region] = from_caaml(json.loads(raw), region)
+    if a.topr and a.region not in found:
+        try:
+            b = topr()
+            if b: found["tatry-pl"] = b
+        except Exception as ex:  # noqa: BLE001
+            print("TOPR błąd:", ex, file=sys.stderr)
     if a.slovakia:
         try:
             sk = slovakia()

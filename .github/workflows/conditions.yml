@@ -2,10 +2,10 @@ name: Warunki (komunikat lawinowy dla aplikacji)
 
 # Plik conditions.json w wydaniu „conditions” – aplikacja pobiera go przy każdym uruchomieniu (1–2 KB).
 # Ręcznie: pole „manual” (komunikat przepisany z lawiny.topr.pl, format w tools/conditions.py) albo „caaml” (adres EAWS CAAML).
-# Słowacja (HZS, CAAML v6) – automatycznie co godzinę w sezonie; TOPR – ręcznie do czasu parsera (avalanche-probe.yml).
+# Automatycznie co godzinę w sezonie: TOPR (lawiny.topr.pl, plik caaml_pl_DATA.json) i HZS (laviny.sk, CAAML v6).
 on:
   schedule:
-    # W sezonie (listopad–maj) co godzinę: komunikat słowacki (CAAML) i zachowanie wpisanego ręcznie TOPR.
+    # W sezonie (listopad–maj) co godzinę.
     - cron: "23 * * 11,12,1,2,3,4,5 *"
   workflow_dispatch:
     inputs:
@@ -29,7 +29,7 @@ jobs:
           MANUAL: ${{ inputs.manual }}
           CAAML: ${{ inputs.caaml }}
         run: |
-          args=(--slovakia --keep "https://github.com/${{ github.repository }}/releases/download/conditions/conditions.json")
+          args=(--topr --slovakia --keep "https://github.com/${{ github.repository }}/releases/download/conditions/conditions.json")
           if [ -n "$MANUAL" ]; then args+=(--manual "$MANUAL"); elif [ -n "$CAAML" ]; then args+=(--caaml "$CAAML"); fi
           python3 tools/conditions.py "${args[@]}" conditions.json
           echo '```json' >> "$GITHUB_STEP_SUMMARY"; cat conditions.json >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
