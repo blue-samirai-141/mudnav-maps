@@ -40,6 +40,7 @@ def topr():
             doc = json.loads(http(f"{TOPR_BASE}caaml_pl_{d.isoformat()}.json"))
         except Exception as ex:  # noqa: BLE001
             print("TOPR", d, ex, file=sys.stderr); continue
+        print("TOPR", d, "plik:", json.dumps(doc, ensure_ascii=False)[:1500], file=sys.stderr)
         b = from_caaml(doc, REGIONS["tatry-pl"])
         if b["levels"]:
             return b
@@ -127,7 +128,13 @@ def from_caaml(doc, region):
                  "aspects": norm_aspects(p.get("aspects"))} for p in b.get("avalancheProblems", [])]
     vt = b.get("validTime", {})
     return {"publishedAt": iso(b.get("publicationTime")), "validFrom": iso(vt.get("startTime")), "validUntil": iso(vt.get("endTime")),
-            "tendency": ((b.get("tendency") or [{}])[0]).get("tendencyType"), "levels": levels, "problems": problems}
+            "tendency": tendency(b.get("tendency")), "levels": levels, "problems": problems}
+
+def tendency(t):
+    """CAAML v6: lista obiektów; TOPR / HZS bywa sam obiekt albo tekst."""
+    if isinstance(t, list): t = t[0] if t else None
+    if isinstance(t, dict): return t.get("tendencyType")
+    return t if isinstance(t, str) else None
 
 def main():
     ap = argparse.ArgumentParser()
@@ -149,13 +156,15 @@ def main():
             b = topr()
             if b: found["tatry-pl"] = b
         except Exception as ex:  # noqa: BLE001
-            print("TOPR błąd:", ex, file=sys.stderr)
+            import traceback; traceback.print_exc()
+            print("TOPR błąd:", repr(ex), file=sys.stderr)
     if a.slovakia:
         try:
             sk = slovakia()
             if sk: found["tatry-sk"] = sk
         except Exception as ex:  # noqa: BLE001 – brak komunikatu nie może zatrzymać pliku
-            print("laviny.sk błąd:", ex, file=sys.stderr)
+            import traceback; traceback.print_exc()
+            print("laviny.sk błąd:", repr(ex), file=sys.stderr)
     out = {"version": 1, "generatedAt": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(), "avalanche": []}
     for rid, bulletin in found.items():
         if bulletin and bulletin["levels"]:
