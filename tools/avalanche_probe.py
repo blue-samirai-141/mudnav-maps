@@ -19,9 +19,20 @@ GUESSES = [
     "https://lawiny.topr.pl/api/bulletin", "https://lawiny.topr.pl/api/bulletins", "https://lawiny.topr.pl/api/v1/bulletin",
     "https://lawiny.topr.pl/caaml", "https://lawiny.topr.pl/bulletin.json", "https://lawiny.topr.pl/feed", "https://lawiny.topr.pl/rss",
     "https://lawiny.topr.pl/wp-json/testapi/v1", "https://lawiny.topr.pl/getwidget",
+    # Rozeznanie 27.11 (docs/KOMUNIKATY_LAWINOWE.md w MudNavProd): GOPR, HZS „latest”, archiwum EAWS, poligony regionów.
+    "https://lawiny.gopr.pl/api/bulletins",
+    "https://static.laviny.sk/bulletins/latest/SK_sk_CAAMLv6_2022.json",
+    "https://regions.avalanches.org/micro-regions/latest/PL-12_micro-regions.geojson.json",
+    "https://regions.avalanches.org/micro-regions/latest/PL_micro-regions.geojson.json",
+    "https://regions.avalanches.org/micro-regions/latest/SK_micro-regions.geojson.json",
+    "https://regions.avalanches.org/micro-regions/latest/CZ_micro-regions.geojson.json",
+    "https://regions.avalanches.org/micro-regions/package.json",
 ]
 
 def caaml_guesses():
+    return []
+
+def _old_caaml_guesses():
     """Katalog uploads/caaml (stąd PDF komunikatu) – możliwe nazwy pliku danych na dziś i wczoraj."""
     import datetime as dt
     base = "https://lawiny.topr.pl/wp-content/uploads/caaml/"
@@ -34,7 +45,25 @@ def caaml_guesses():
             out.append(base + name)
     return out
 
-def get(url, limit=3_000_000):
+def structure(body):
+    """Klucze JSON-a (i pierwszego elementu list / features) – do pisania parsera bez całego pliku w logu."""
+    try:
+        d = json.loads(body)
+    except Exception:  # noqa: BLE001
+        return "nie JSON"
+    def keys(x, depth=0):
+        if depth > 3: return "…"
+        if isinstance(x, dict):
+            return "{" + ", ".join(f"{k}: {keys(v, depth + 1)}" for k, v in list(x.items())[:25]) + "}"
+        if isinstance(x, list):
+            return f"[{len(x)}× " + (keys(x[0], depth + 1) if x else "") + "]"
+        return repr(x)[:60]
+    out = keys(d)
+    if isinstance(d, dict) and "features" in d:
+        out += "\n--- id regionów: " + ", ".join(str(f.get("properties", {}).get("id") or f.get("id")) for f in d["features"][:60])
+    return out[:3000]
+
+def get(url, limit=12_000_000):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
@@ -51,7 +80,7 @@ def main(out):
     os.makedirs(out, exist_ok=True)
     md = ["# Komunikat lawinowy – diagnostyka źródeł", ""]
     seen = set()
-    queue = list(PAGES)
+    queue = list(PAGES) if os.environ.get("CRAWL") else []
     found = []
     while queue:
         url = queue.pop(0)
@@ -80,10 +109,10 @@ def main(out):
         md.append(f"- zgadywane `{status}` {ctype[:40]} – {g} ({len(body)} B)")
         if body:
             open(os.path.join(out, safe(g)), "wb").write(body)
-            found.append((g, ctype, body[:400].decode("utf-8", "replace")))
+            found.append((g, ctype, body[:400].decode("utf-8", "replace") + "\n--- struktura: " + structure(body)))
     md += ["", "## Dane (JSON / XML)", ""]
     for url, ctype, head in found:
-        md += [f"### {url}", f"`{ctype}`", "```", head.replace("```", "'''"), "```", ""]
+        md += [f"### {url}", f"`{ctype}`", "```", head.replace("```", "'''")[:4000], "```", ""]
     if not found:
         md.append("Brak źródeł JSON/XML – komunikat trzeba czytać z HTML (zapisane strony w artefakcie).")
     open(os.path.join(out, "wynik.md"), "w").write("\n".join(md) + "\n")
