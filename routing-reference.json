@@ -1,0 +1,411 @@
+{
+ "note": "Zestaw wzorcowy WE-04: silnik MudNav kontra BRouter (docs/SILNIK.md w MudNavProd). Punkty [lat, lon].",
+ "routes": [
+  {
+   "name": "Kuźnice → Kasprowy Wierch",
+   "points": [
+    [
+     49.2705,
+     19.981
+    ],
+    [
+     49.2318,
+     19.9816
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Palenica Białczańska → Morskie Oko",
+   "points": [
+    [
+     49.2547,
+     20.1036
+    ],
+    [
+     49.2015,
+     20.0713
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Kuźnice → Giewont",
+   "points": [
+    [
+     49.2705,
+     19.981
+    ],
+    [
+     49.251,
+     19.9341
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Kalatówki → Murowaniec",
+   "points": [
+    [
+     49.2594,
+     19.9666
+    ],
+    [
+     49.2434,
+     20.0072
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Kiry → Hala Ornak",
+   "points": [
+    [
+     49.2775,
+     19.8643
+    ],
+    [
+     49.2291,
+     19.8587
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Palenica → Dolina Pięciu Stawów",
+   "points": [
+    [
+     49.2547,
+     20.1036
+    ],
+    [
+     49.2136,
+     20.0487
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Kuźnice → Nosal",
+   "points": [
+    [
+     49.2705,
+     19.981
+    ],
+    [
+     49.2764,
+     19.9895
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Morskie Oko → Rysy",
+   "points": [
+    [
+     49.2015,
+     20.0713
+    ],
+    [
+     49.1795,
+     20.0881
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Zakopane dworzec → Kuźnice (miasto)",
+   "points": [
+    [
+     49.3001,
+     19.959
+    ],
+    [
+     49.2705,
+     19.981
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Krupówki → Gubałówka dolna stacja (miasto)",
+   "points": [
+    [
+     49.2967,
+     19.9504
+    ],
+    [
+     49.3,
+     19.944
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Krupówki → Kalatówki",
+   "points": [
+    [
+     49.2967,
+     19.9504
+    ],
+    [
+     49.2594,
+     19.9666
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Kuźnice → Murowaniec",
+   "points": [
+    [
+     49.2705,
+     19.981
+    ],
+    [
+     49.2434,
+     20.0072
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Zawrat → Kozi Wierch (Orla Perć, z prądem)",
+   "points": [
+    [
+     49.21909,
+     20.01639
+    ],
+    [
+     49.21832,
+     20.02871
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Kozi Wierch → Zawrat (Orla Perć pod prąd – trasa nie może iść granią)",
+   "points": [
+    [
+     49.21832,
+     20.02871
+    ],
+    [
+     49.21909,
+     20.01639
+    ]
+   ],
+   "range": "Tatry"
+  },
+  {
+   "name": "Zawoja Markowe → Babia Góra",
+   "range": "Beskid Żywiecki",
+   "points": [
+    [
+     49.59997,
+     19.50932
+    ],
+    [
+     49.57302,
+     19.52933
+    ]
+   ]
+  },
+  {
+   "name": "Nowy Targ Kowaniec → Turbacz",
+   "range": "Gorce",
+   "points": [
+    [
+     49.50467,
+     20.07527
+    ],
+    [
+     49.54282,
+     20.11138
+    ]
+   ]
+  },
+  {
+   "name": "Korbielów → Pilsko",
+   "range": "Beskid Żywiecki",
+   "points": [
+    [
+     49.57571,
+     19.34405
+    ],
+    [
+     49.52797,
+     19.3168
+    ]
+   ]
+  },
+  {
+   "name": "Szczyrk Solisko → Skrzyczne",
+   "range": "Beskid Śląski",
+   "points": [
+    [
+     49.6845,
+     18.97561
+    ],
+    [
+     49.68457,
+     19.03027
+    ]
+   ]
+  },
+  {
+   "name": "Sromowce Niżne → Trzy Korony",
+   "range": "Pieniny",
+   "points": [
+    [
+     49.39514,
+     20.40949
+    ],
+    [
+     49.41446,
+     20.4152
+    ]
+   ]
+  },
+  {
+   "name": "Krościenko → Trzy Korony",
+   "range": "Pieniny",
+   "points": [
+    [
+     49.44055,
+     20.42776
+    ],
+    [
+     49.41446,
+     20.4152
+    ]
+   ]
+  },
+  {
+   "name": "Wołosate → Tarnica",
+   "range": "Bieszczady",
+   "points": [
+    [
+     49.06641,
+     22.68038
+    ],
+    [
+     49.07477,
+     22.72632
+    ]
+   ]
+  },
+  {
+   "name": "Karpacz → Śnieżka",
+   "range": "Karkonosze",
+   "points": [
+    [
+     50.78278,
+     15.7621
+    ],
+    [
+     50.73603,
+     15.73961
+    ]
+   ]
+  },
+  {
+   "name": "Karłów → Szczeliniec Wielki",
+   "range": "Góry Stołowe",
+   "points": [
+    [
+     50.47563,
+     16.33817
+    ],
+    [
+     50.48481,
+     16.34101
+    ]
+   ]
+  },
+  {
+   "name": "Biela Púť → Chopok",
+   "range": "Niżne Tatry (SK)",
+   "points": [
+    [
+     48.9715,
+     19.5849
+    ],
+    [
+     48.94301,
+     19.59272
+    ]
+   ]
+  },
+  {
+   "name": "Tri Studničky → Kriváň",
+   "range": "Tatry (SK)",
+   "points": [
+    [
+     49.14,
+     19.96637
+    ],
+    [
+     49.16283,
+     20.00005
+    ]
+   ]
+  },
+  {
+   "name": "Ostravice → Lysá hora",
+   "range": "Beskid Morawsko-Śląski (CZ)",
+   "points": [
+    [
+     49.53863,
+     18.39286
+    ],
+    [
+     49.54598,
+     18.44727
+    ]
+   ]
+  },
+  {
+   "name": "Rycerka → Wielka Racza",
+   "range": "Beskid Żywiecki",
+   "points": [
+    [
+     49.43979,
+     19.01616
+    ],
+    [
+     49.41334,
+     18.9688
+    ]
+   ]
+  },
+  {
+   "name": "Štrbské Pleso → Rysy",
+   "range": "Tatry (SK)",
+   "points": [
+    [
+     49.11764,
+     20.06317
+    ],
+    [
+     49.17946,
+     20.08808
+    ]
+   ]
+  },
+  {
+   "name": "Kraków Rynek → Kopiec Kościuszki",
+   "range": "Miasto",
+   "points": [
+    [
+     50.0617,
+     19.9373
+    ],
+    [
+     50.0549,
+     19.8932
+    ]
+   ]
+  }
+ ]
+}

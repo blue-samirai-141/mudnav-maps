@@ -1,0 +1,32 @@
+name: Trasy wzorcowe (BRouter)
+
+# Zestaw wzorcowy WE-04 (routing-reference.json): trasy z brouter.de do porównania z silnikiem MudNav.
+# Wynik: brouter-reference.zip w wydaniu „routing”. Porównanie liczy test WalkReferenceTest w MudNavProd.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [routing-reference.json]
+
+permissions:
+  contents: write
+
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trasy z BRoutera
+        run: python3 tools/brouter_ref.py routing-reference.json out/brouter
+      - name: Publikacja (wydanie „routing”)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp routing-reference.json out/
+          (cd out && zip -q -r brouter-reference.zip brouter routing-reference.json)
+          if ! gh release view routing >/dev/null 2>&1; then
+            gh release create routing --latest=false --title "Silnik tras MudNav – grafy (beta)" \
+              --notes "Grafy dróg pieszych dla nowego silnika tras i trasy wzorcowe BRoutera."
+          fi
+          gh release upload routing out/brouter-reference.zip --clobber
